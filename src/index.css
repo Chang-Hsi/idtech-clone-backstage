@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 * {
   box-sizing: border-box;
 }
@@ -9,4 +11,161 @@ body,
   padding: 0;
   width: 100%;
   min-height: 100%;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(calc(var(--anim-distance, 32px) * -1));
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(var(--anim-distance, 32px));
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(var(--anim-distance, 32px));
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(var(--anim-distance, 32px));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(calc(var(--anim-distance, 32px) * -1));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: var(--fade-start-opacity, 0);
+    transform: translateX(calc(var(--anim-distance, 32px) * -1));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: var(--fade-start-opacity, 0);
+    transform: translateX(var(--anim-distance, 32px));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: var(--fade-start-opacity, 0);
+    transform: translateY(var(--anim-distance, 32px));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: var(--fade-start-opacity, 0);
+    transform: translateY(calc(var(--anim-distance, 32px) * -1));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-left-in {
+  animation: slideInLeft var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.slide-right-in {
+  animation: slideInRight var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.slide-right-out {
+  animation: slideOutRight var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.slide-up-in {
+  animation: slideInUp var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.slide-down-in {
+  animation: slideInDown var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.fade-left-in {
+  animation: fadeInLeft var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.fade-right-in {
+  animation: fadeInRight var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.fade-up-in {
+  animation: fadeInUp var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+.fade-down-in {
+  animation: fadeInDown var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-left-in,
+  .slide-right-in,
+  .slide-right-out,
+  .slide-up-in,
+  .slide-down-in,
+  .fade-left-in,
+  .fade-right-in,
+  .fade-up-in,
+  .fade-down-in {
+    animation: none;
+  }
 }

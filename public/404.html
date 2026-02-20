@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting...</title>
+  </head>
+  <body>
+    <script>
+      ;(() => {
+        const repoBase = '/idtech-clone-backstage'
+        const isRepoPath = window.location.pathname.startsWith(`${repoBase}/`)
+        const basePath = isRepoPath ? repoBase : ''
+        const relativePath = isRepoPath
+          ? window.location.pathname.slice(repoBase.length)
+          : window.location.pathname
+        const redirectValue = `${relativePath}${window.location.search}${window.location.hash}`
+        const nextUrl = `${basePath}/?__redirect=${encodeURIComponent(redirectValue)}`
+
+        window.location.replace(nextUrl)
+      })()
+    </script>
+  </body>
+</html>
