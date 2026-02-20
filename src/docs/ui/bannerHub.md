@@ -13,7 +13,7 @@
 1. 後台路由：`/pages/banner-hub`
 2. 側欄名稱：`Page Types > Banner Hub`
 3. 頁面組成：
-- `src/pages/Pages/BannerHubPageManager.jsx`：只負責拼接
+- `src/pages/pageTypes/BannerHubPageManager.jsx`：只負責拼接
 - `src/components/pages/bannerHub/BannerHubManagerContent.jsx`：主內容與邏輯
 - `src/components/pages/bannerHub/BannerHubRowEditorDrawer.jsx`：抽屜編輯
 

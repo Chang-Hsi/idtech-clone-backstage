@@ -91,14 +91,18 @@ Main 區塊為主要編輯區域：
 
 - `/dashboard`
 - `/pages/home`
-- `/pages/products`
-- `/pages/use-cases`
-- `/pages/resources`
-- `/pages/company`
+- `/pages/banner-hub`
 - `/pages/contact`
 - `/pages/legal`
 - `/pages/content/products`
+- `/pages/content/products/new`
+- `/pages/content/products/:slug/edit`
 - `/pages/content/collections`
+- `/pages/content/collections/new`
+- `/pages/content/collections/:slug/edit`
+- `/pages/content/use-cases`
+- `/pages/content/resources`
+- `/pages/content/company`
 - `/pages/content/articles`
 - `/pages/content/jobs`
 - `/seo`
@@ -115,14 +119,40 @@ src/
   app/
     store.js
 
+  components/
+    pages/
+      bannerHub/
+      collections/
+      home/
+      products/
+
   layout/
     AppLayout.jsx
+    AuthLayout.jsx
 
   pages/
+    pageTypes/
+      HomePageManager.jsx
+      BannerHubPageManager.jsx
+    contentTypes/
+      ProductsContentPageManager.jsx
+      ProductCreatePageManager.jsx
+      ProductEditPageManager.jsx
+      CollectionsContentPageManager.jsx
+      CollectionCreatePageManager.jsx
+      CollectionEditPageManager.jsx
+    LoginPage.jsx
     PlaceholderPage.jsx
 
   routes/
+    guards/
     router.jsx
+
+  features/
+    auth/
+
+  lib/
+    request.js
 
   docs/
     ui/
@@ -135,8 +165,11 @@ src/
 說明：
 
 - `AppLayout.jsx`：後台主要框架（主 Sidebar + 子 Sidebar + Main）
+- `AuthLayout.jsx`：登入流程使用的布局
 - `router.jsx`：路由與 layout metadata 規劃中心
-- `PlaceholderPage.jsx`：MVP 階段的內容占位頁
+- `pageTypes/*Manager.jsx`：Page Types 入口層（只拼接）
+- `contentTypes/*Manager.jsx`：Content Types 入口層（只拼接）
+- `components/pages/*`：頁面實際功能與 UI
 - `store.js`：Redux store 基礎入口
 
 ## 6. Responsive 規劃（待強化）

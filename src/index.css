@@ -169,3 +169,139 @@ body,
     animation: none;
   }
 }
+
+.md-prose {
+  max-width: 1280px;
+  font-size: 1rem;
+  line-height: 1.72;
+  letter-spacing: 0;
+  color: rgb(23 23 23 / 0.66);
+}
+
+.md-prose h1 {
+  margin-top: 1.7rem;
+  font-size: clamp(1.55rem, 3.2vw, 2.2rem);
+  line-height: 1.24;
+  font-weight: 600;
+  color: rgb(16 24 32 / 0.78);
+  letter-spacing: 0.01em;
+}
+
+.md-prose h2 {
+  margin-top: 1.5rem;
+  font-size: clamp(1.22rem, 2.2vw, 1.5rem);
+  line-height: 1.33;
+  font-weight: 600;
+  color: rgb(3 121 90 / 0.9);
+  letter-spacing: 0.01em;
+}
+
+.md-prose p {
+  margin-top: 0.8rem;
+}
+
+.md-prose ul {
+  margin-top: 0.8rem;
+  padding-left: 1.4rem;
+  list-style: disc;
+}
+
+.md-prose li + li {
+  margin-top: 0.5rem;
+}
+
+.md-prose a {
+  color: rgb(3 121 90);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.md-prose .md-table {
+  margin-top: 1rem;
+  font-size: 0.94em;
+  border: 1px solid rgb(17 24 39 / 0.12);
+}
+
+.md-prose .md-table th,
+.md-prose .md-table td {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid rgb(17 24 39 / 0.12);
+}
+
+.md-prose .md-table th {
+  font-weight: 600;
+  color: rgb(17 24 39 / 0.8);
+  background: rgb(17 24 39 / 0.04);
+}
+
+.md-prose .md-code-block {
+  margin-top: 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgb(17 24 39 / 0.14);
+  background: rgb(17 24 39 / 0.92);
+  padding: 0.8rem 0.9rem;
+}
+
+.md-prose .md-code-block code {
+  font-size: 0.86em;
+  line-height: 1.6;
+  color: rgb(241 245 249);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+}
+
+@media (max-width: 640px) {
+  .md-prose {
+    font-size: 0.94rem;
+    line-height: 1.65;
+  }
+}
+
+/* Keep @uiw markdown preview visually aligned with frontend prose styles. */
+.w-md-editor-preview .wmde-markdown.md-prose {
+  max-width: 1280px;
+  font-size: 1rem;
+  line-height: 1.72;
+  letter-spacing: 0;
+  color: rgb(23 23 23 / 0.66);
+}
+
+.w-md-editor-preview .wmde-markdown.md-prose h1 {
+  margin-top: 1.7rem;
+  font-size: clamp(1.55rem, 3.2vw, 2.2rem);
+  line-height: 1.24;
+  font-weight: 600;
+  color: rgb(16 24 32 / 0.78);
+  letter-spacing: 0.01em;
+}
+
+.w-md-editor-preview .wmde-markdown.md-prose h2 {
+  margin-top: 1.5rem;
+  font-size: clamp(1.22rem, 2.2vw, 1.5rem);
+  line-height: 1.33;
+  font-weight: 600;
+  color: rgb(3 121 90 / 0.9);
+  letter-spacing: 0.01em;
+}
+
+.w-md-editor-preview .wmde-markdown.md-prose p {
+  margin-top: 0.8rem;
+}
+
+.w-md-editor-preview .wmde-markdown.md-prose ul {
+  margin-top: 0.8rem;
+  padding-left: 1.4rem;
+  list-style: disc;
+}
+
+.w-md-editor-preview .wmde-markdown.md-prose li + li {
+  margin-top: 0.5rem;
+}
+
+.w-md-editor-preview .wmde-markdown.md-prose a {
+  color: rgb(3 121 90);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

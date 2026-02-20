@@ -27,9 +27,9 @@
 頁面分層：
 
 1. `pages` 僅拼接：
-   - `src/pages/Pages/ProductsContentPageManager.jsx`
-   - `src/pages/Pages/ProductCreatePageManager.jsx`
-   - `src/pages/Pages/ProductEditPageManager.jsx`
+   - `src/pages/contentTypes/ProductsContentPageManager.jsx`
+   - `src/pages/contentTypes/ProductCreatePageManager.jsx`
+   - `src/pages/contentTypes/ProductEditPageManager.jsx`
 2. 實作在 `components`：
    - `src/components/pages/products/ProductsContentList.jsx`
    - `src/components/pages/products/ProductEditorPage.jsx`

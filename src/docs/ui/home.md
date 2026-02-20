@@ -101,7 +101,7 @@
 
 ## 5. 前端檔案結構（目前）
 
-1. `src/pages/Pages/HomePageManager.jsx`
+1. `src/pages/pageTypes/HomePageManager.jsx`
 2. `src/components/pages/home/HomeHeroListSection.jsx`
 3. `src/components/pages/home/HomeHeroEditorDrawer.jsx`
 4. `src/components/dialog/ConfirmDialog.jsx`

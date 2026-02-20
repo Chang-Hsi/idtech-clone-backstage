@@ -2,14 +2,18 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import AppLayout from '../layout/AppLayout'
 import AuthLayout from '../layout/AuthLayout'
 import LoginPage from '../pages/LoginPage'
-import HomePageManager from '../pages/Pages/HomePageManager'
-import BannerHubPageManager from '../pages/Pages/BannerHubPageManager'
-import ProductsContentPageManager from '../pages/Pages/ProductsContentPageManager'
-import ProductCreatePageManager from '../pages/Pages/ProductCreatePageManager'
-import ProductEditPageManager from '../pages/Pages/ProductEditPageManager'
-import CollectionsContentPageManager from '../pages/Pages/CollectionsContentPageManager'
-import CollectionCreatePageManager from '../pages/Pages/CollectionCreatePageManager'
-import CollectionEditPageManager from '../pages/Pages/CollectionEditPageManager'
+import HomePageManager from '../pages/pageTypes/HomePageManager'
+import BannerHubPageManager from '../pages/pageTypes/BannerHubPageManager'
+import PrivacyPolicyPageManager from '../pages/pageTypes/PrivacyPolicyPageManager'
+import ProductsContentPageManager from '../pages/contentTypes/ProductsContentPageManager'
+import ProductCreatePageManager from '../pages/contentTypes/ProductCreatePageManager'
+import ProductEditPageManager from '../pages/contentTypes/ProductEditPageManager'
+import CollectionsContentPageManager from '../pages/contentTypes/CollectionsContentPageManager'
+import CollectionCreatePageManager from '../pages/contentTypes/CollectionCreatePageManager'
+import CollectionEditPageManager from '../pages/contentTypes/CollectionEditPageManager'
+import UseCasesContentPageManager from '../pages/contentTypes/UseCasesContentPageManager'
+import UseCaseCreatePageManager from '../pages/contentTypes/UseCaseCreatePageManager'
+import UseCaseEditPageManager from '../pages/contentTypes/UseCaseEditPageManager'
 import PlaceholderPage from '../pages/PlaceholderPage'
 import RequireAuth from './guards/RequireAuth'
 import RequireGuest from './guards/RequireGuest'
@@ -50,6 +54,7 @@ const pageRoutes = [
     description: 'Manage legal content entries such as privacy policy text.',
     primaryNav: 'pages',
     secondaryNav: 'pages',
+    element: <PrivacyPolicyPageManager />,
   },
   {
     path: 'pages/content/products',
@@ -105,6 +110,23 @@ const pageRoutes = [
     description: 'Content-type management for use case cards and detail entities.',
     primaryNav: 'pages',
     secondaryNav: 'pages',
+    element: <UseCasesContentPageManager />,
+  },
+  {
+    path: 'pages/content/use-cases/new',
+    title: 'Create Use Case',
+    description: 'Create a new use case entity.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <UseCaseCreatePageManager />,
+  },
+  {
+    path: 'pages/content/use-cases/:slug/edit',
+    title: 'Edit Use Case',
+    description: 'Edit use case entity.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <UseCaseEditPageManager />,
   },
   {
     path: 'pages/content/resources',
