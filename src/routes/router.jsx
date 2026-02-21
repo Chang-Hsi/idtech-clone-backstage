@@ -4,6 +4,7 @@ import AuthLayout from '../layout/AuthLayout'
 import LoginPage from '../pages/LoginPage'
 import HomePageManager from '../pages/pageTypes/HomePageManager'
 import BannerHubPageManager from '../pages/pageTypes/BannerHubPageManager'
+import ContactPageManager from '../pages/pageTypes/ContactPageManager'
 import PrivacyPolicyPageManager from '../pages/pageTypes/PrivacyPolicyPageManager'
 import ProductsContentPageManager from '../pages/contentTypes/ProductsContentPageManager'
 import ProductCreatePageManager from '../pages/contentTypes/ProductCreatePageManager'
@@ -47,6 +48,7 @@ const pageRoutes = [
     description: 'Manage contact content blocks and CTA messaging.',
     primaryNav: 'pages',
     secondaryNav: 'pages',
+    element: <ContactPageManager />,
   },
   {
     path: 'pages/legal',

@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import useFormValidation from '../../../hooks/useFormValidation'
+import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
+import { buildHomeHeroDrawerSchema } from './HomeHeroEditorDrawer.schema'
 
 const PRESET_OPTIONS = [
   { value: 'left', label: 'Layout A - Left Content' },
@@ -150,11 +153,14 @@ const findForegroundImage = (layers = []) =>
 
 const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) => {
   const CLOSE_ANIMATION_MS = 220
+  const { getFieldError, validateField, validateMany, clearAll } = useFormValidation()
   const [draft, setDraft] = useState(() => initialSlide)
   const [layoutPreset, setLayoutPreset] = useState(() => inferPresetFromLayers(initialSlide?.layers))
   const [foregroundImageUrl, setForegroundImageUrl] = useState(() => findForegroundImage(initialSlide?.layers))
   const [error, setError] = useState('')
+  const [validationErrors, setValidationErrors] = useState([])
   const [isClosing, setIsClosing] = useState(false)
+  const validationSchema = buildHomeHeroDrawerSchema({ layoutPreset })
 
   if (!isOpen || !draft) return null
 
@@ -177,32 +183,21 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
   }
 
   const handleApply = () => {
-    if (!draft.id.trim() || !draft.title.trim() || !draft.desc.trim()) {
-      setError('Id, title, and description are required.')
-      return
-    }
-
-    if (!draft.primaryCta.label.trim() || !draft.primaryCta.to.trim()) {
-      setError('Primary CTA label and link are required.')
-      return
-    }
-
-    if (!draft.background.imageUrl.trim()) {
-      setError('Background image URL is required.')
-      return
-    }
-
-    if (layoutPreset === 'split' && !foregroundImageUrl.trim()) {
-      setError('Foreground image URL is required for split layout.')
+    const fullDraft = { ...draft, foregroundImageUrl }
+    const quickValid = validateMany(
+      validationSchema.map((field) => ({
+        name: field.name,
+        validate: () => validateSchemaField(validationSchema, fullDraft, field.name),
+      }))
+    )
+    const validation = validateSchema(validationSchema, fullDraft)
+    if (!quickValid || !validation.valid) {
+      setError('Please fix validation errors before apply.')
+      setValidationErrors(validation.errors)
       return
     }
 
     const normalizedOpacity = Number(draft.background.overlayOpacity)
-    if (Number.isNaN(normalizedOpacity) || normalizedOpacity < 0 || normalizedOpacity > 1) {
-      setError('Overlay opacity must be between 0 and 1.')
-      return
-    }
-
     const generatedLayers = buildLayersByPreset({
       slideId: draft.id,
       preset: layoutPreset,
@@ -221,6 +216,7 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
       },
       layers: generatedLayers,
     })
+    clearAll()
     setIsClosing(true)
     window.setTimeout(() => onClose(), CLOSE_ANIMATION_MS)
   }
@@ -273,69 +269,105 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
           </div>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Slide ID</span>
+            <span className="font-medium text-slate-700">
+              Slide ID<span className="ml-1 text-red-500">*</span>
+            </span>
             <input
               value={draft.id}
               onChange={(event) => update('id', event.target.value)}
+              onBlur={() => validateField('id', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'id'))}
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
             />
+            {getFieldError('id') ? <p className="text-xs text-red-600">{getFieldError('id')}</p> : null}
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Title</span>
+            <span className="font-medium text-slate-700">
+              Title<span className="ml-1 text-red-500">*</span>
+            </span>
             <input
               value={draft.title}
               onChange={(event) => update('title', event.target.value)}
+              onBlur={() => validateField('title', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'title'))}
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
             />
+            {getFieldError('title') ? <p className="text-xs text-red-600">{getFieldError('title')}</p> : null}
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Description</span>
+            <span className="font-medium text-slate-700">
+              Description<span className="ml-1 text-red-500">*</span>
+            </span>
             <textarea
               rows={3}
               value={draft.desc}
               onChange={(event) => update('desc', event.target.value)}
+              onBlur={() => validateField('desc', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'desc'))}
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
             />
+            {getFieldError('desc') ? <p className="text-xs text-red-600">{getFieldError('desc')}</p> : null}
           </label>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Primary CTA Label</span>
+              <span className="font-medium text-slate-700">
+                Primary CTA Label<span className="ml-1 text-red-500">*</span>
+              </span>
               <input
                 value={draft.primaryCta.label}
                 onChange={(event) => update('primaryCta.label', event.target.value)}
+                onBlur={() => validateField('primaryCta.label', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'primaryCta.label'))}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
+              {getFieldError('primaryCta.label') ? (
+                <p className="text-xs text-red-600">{getFieldError('primaryCta.label')}</p>
+              ) : null}
             </label>
             <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Primary CTA Link</span>
+              <span className="font-medium text-slate-700">
+                Primary CTA Link<span className="ml-1 text-red-500">*</span>
+              </span>
               <input
                 value={draft.primaryCta.to}
                 onChange={(event) => update('primaryCta.to', event.target.value)}
+                onBlur={() => validateField('primaryCta.to', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'primaryCta.to'))}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
+              {getFieldError('primaryCta.to') ? (
+                <p className="text-xs text-red-600">{getFieldError('primaryCta.to')}</p>
+              ) : null}
             </label>
           </div>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Background Image URL</span>
+            <span className="font-medium text-slate-700">
+              Background Image URL<span className="ml-1 text-red-500">*</span>
+            </span>
             <input
               value={draft.background.imageUrl}
               onChange={(event) => update('background.imageUrl', event.target.value)}
+              onBlur={() => validateField('background.imageUrl', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'background.imageUrl'))}
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
             />
+            {getFieldError('background.imageUrl') ? (
+              <p className="text-xs text-red-600">{getFieldError('background.imageUrl')}</p>
+            ) : null}
           </label>
 
           {layoutPreset === 'split' ? (
             <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Foreground Image URL</span>
+              <span className="font-medium text-slate-700">
+                Foreground Image URL<span className="ml-1 text-red-500">*</span>
+              </span>
               <input
                 value={foregroundImageUrl}
                 onChange={(event) => setForegroundImageUrl(event.target.value)}
+                onBlur={() => validateField('foregroundImageUrl', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'foregroundImageUrl'))}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
+              {getFieldError('foregroundImageUrl') ? (
+                <p className="text-xs text-red-600">{getFieldError('foregroundImageUrl')}</p>
+              ) : null}
             </label>
           ) : null}
 
@@ -357,12 +389,23 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
                 step={0.05}
                 value={draft.background.overlayOpacity}
                 onChange={(event) => update('background.overlayOpacity', event.target.value)}
+                onBlur={() => validateField('background.overlayOpacity', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'background.overlayOpacity'))}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
+              {getFieldError('background.overlayOpacity') ? (
+                <p className="text-xs text-red-600">{getFieldError('background.overlayOpacity')}</p>
+              ) : null}
             </label>
           </div>
 
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {validationErrors.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5 text-xs text-red-600">
+              {validationErrors.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         <div className="mt-6 flex items-center gap-2">

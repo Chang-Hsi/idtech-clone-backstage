@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../../features/auth/AuthProvider'
+import FormField from '../../common/FormField'
+import useFormValidation from '../../../hooks/useFormValidation'
 import {
   createBackstageProduct,
   fetchBackstageProductBySlug,
   updateBackstageProduct,
 } from '../../../api/backstageContentProductsApi'
+import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
+import { buildProductEditorValidationSchema } from './ProductEditorPage.schema'
 
 const buildInitialForm = () => ({
   name: '',
@@ -20,10 +24,12 @@ const ProductEditorPage = ({ mode }) => {
   const navigate = useNavigate()
   const { slug } = useParams()
   const { user } = useAuth()
+  const { clearAll, getFieldError, validateField, validateMany } = useFormValidation()
   const editorId = useMemo(() => user?.email ?? user?.name ?? 'unknown-editor', [user])
 
   const [status, setStatus] = useState('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [validationErrors, setValidationErrors] = useState([])
   const [successMessage, setSuccessMessage] = useState('')
   const [currentSlug, setCurrentSlug] = useState(slug ?? '')
   const [form, setForm] = useState(buildInitialForm)
@@ -31,6 +37,10 @@ const ProductEditorPage = ({ mode }) => {
   const [heroPreviewState, setHeroPreviewState] = useState('idle')
   const previewBlurTimerRef = useRef(null)
   const previewImgRef = useRef(null)
+  const validationSchema = useMemo(() => buildProductEditorValidationSchema(form), [form])
+
+  const validateByFieldName = (fieldName) =>
+    validateField(fieldName, () => validateSchemaField(validationSchema, form, fieldName))
 
   useEffect(() => {
     if (mode !== 'edit' || !slug) return
@@ -38,6 +48,7 @@ const ProductEditorPage = ({ mode }) => {
     const load = async () => {
       setStatus('loading')
       setErrorMessage('')
+      setValidationErrors([])
 
       try {
         const payload = await fetchBackstageProductBySlug(slug)
@@ -68,6 +79,7 @@ const ProductEditorPage = ({ mode }) => {
         }
 
         setStatus('success')
+        clearAll()
       } catch (error) {
         setStatus('error')
         setErrorMessage(error.message || 'Unable to load product')
@@ -75,7 +87,7 @@ const ProductEditorPage = ({ mode }) => {
     }
 
     load()
-  }, [mode, slug])
+  }, [clearAll, mode, slug])
 
   useEffect(() => {
     return () => {
@@ -171,8 +183,24 @@ const ProductEditorPage = ({ mode }) => {
 
   const submit = async (event) => {
     event.preventDefault()
+    const quickValid = validateMany(
+      validationSchema.map((field) => ({
+        name: field.name,
+        validate: () => validateSchemaField(validationSchema, form, field.name),
+      }))
+    )
+    const validation = validateSchema(validationSchema, form)
+    if (!quickValid || !validation.valid) {
+      setStatus('error')
+      setErrorMessage('Please fix the validation errors before saving.')
+      setValidationErrors(validation.errors)
+      setSuccessMessage('')
+      return
+    }
+
     setStatus('saving')
     setErrorMessage('')
+    setValidationErrors([])
     setSuccessMessage('')
 
     try {
@@ -222,7 +250,16 @@ const ProductEditorPage = ({ mode }) => {
       </div>
 
       {errorMessage ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</div>
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p>{errorMessage}</p>
+          {validationErrors.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {validationErrors.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
       {successMessage ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -234,61 +271,70 @@ const ProductEditorPage = ({ mode }) => {
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Basic</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Name *</span>
+            <FormField label="Name" required error={getFieldError('name')}>
               <input
                 value={form.name}
                 onChange={(event) => updateField('name', event.target.value)}
-                required
+                onBlur={() => validateByFieldName('name')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Slug</span>
+            <FormField label="Slug">
               <input
                 value={mode === 'edit' ? currentSlug : '(Auto generated after create)'}
                 readOnly
                 className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-slate-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Short Description</span>
+            <FormField
+              label="Short Description"
+              required
+              className="md:col-span-2"
+              error={getFieldError('shortDescription')}
+            >
               <textarea
                 rows={3}
                 value={form.shortDescription}
                 onChange={(event) => updateField('shortDescription', event.target.value)}
+                onBlur={() => validateByFieldName('shortDescription')}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm md:max-w-[220px]">
-              <span className="font-medium text-slate-700">Status</span>
+            <FormField
+              label="Status"
+              className="md:max-w-[220px]"
+              error={getFieldError('status')}
+            >
               <select
                 value={form.status}
                 onChange={(event) => updateField('status', event.target.value)}
+                onBlur={() => validateByFieldName('status')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               >
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
               </select>
-            </label>
+            </FormField>
           </div>
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Media</h2>
           <div className="mt-4 grid gap-4">
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Hero Image URL</span>
+            <FormField label="Hero Image URL" required error={getFieldError('media.heroImageUrl')}>
               <input
                 value={form.media.heroImageUrl}
                 onChange={(event) => updateNestedField('media', 'heroImageUrl', event.target.value)}
-                onBlur={syncHeroPreviewAfterBlur}
+                onBlur={() => {
+                  syncHeroPreviewAfterBlur()
+                  validateByFieldName('media.heroImageUrl')
+                }}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
             <div className="space-y-1 text-sm">
               <p className="font-medium text-slate-700">Background Preview</p>
               {!heroPreviewUrl ? (
@@ -324,61 +370,77 @@ const ProductEditorPage = ({ mode }) => {
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Detail</h2>
           <div className="mt-4 grid gap-4">
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Hero Eyebrow</span>
+            <FormField label="Hero Eyebrow" required error={getFieldError('detail.heroEyebrow')}>
               <input
                 value={form.detail.heroEyebrow}
                 onChange={(event) => updateNestedField('detail', 'heroEyebrow', event.target.value)}
+                onBlur={() => validateByFieldName('detail.heroEyebrow')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Hero Description</span>
+            </FormField>
+            <FormField
+              label="Hero Description"
+              required
+              error={getFieldError('detail.heroDescription')}
+            >
               <textarea
                 rows={3}
                 value={form.detail.heroDescription}
                 onChange={(event) => updateNestedField('detail', 'heroDescription', event.target.value)}
+                onBlur={() => validateByFieldName('detail.heroDescription')}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
-            </label>
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Detail Hero Image URL</span>
+            </FormField>
+            <FormField
+              label="Detail Hero Image URL"
+              required
+              error={getFieldError('detail.heroImageUrl')}
+            >
               <input
                 value={form.detail.heroImageUrl}
                 onChange={(event) => updateNestedField('detail', 'heroImageUrl', event.target.value)}
+                onBlur={() => validateByFieldName('detail.heroImageUrl')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
           </div>
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Downloads</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Datasheet Name</span>
+            <FormField label="Datasheet Name" error={getFieldError('downloads.datasheetName')}>
               <input
                 value={form.downloads.datasheetName}
                 onChange={(event) => updateNestedField('downloads', 'datasheetName', event.target.value)}
+                onBlur={() => validateByFieldName('downloads.datasheetName')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
-            <label className="block space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Datasheet URL</span>
+            </FormField>
+            <FormField
+              label="Datasheet URL"
+              className="md:col-span-2"
+              error={getFieldError('downloads.datasheetUrl')}
+            >
               <input
                 value={form.downloads.datasheetUrl}
                 onChange={(event) => updateNestedField('downloads', 'datasheetUrl', event.target.value)}
+                onBlur={() => validateByFieldName('downloads.datasheetUrl')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
-            <label className="block space-y-1 text-sm md:max-w-[220px]">
-              <span className="font-medium text-slate-700">Datasheet Mime Type</span>
+            </FormField>
+            <FormField
+              label="Datasheet Mime Type"
+              className="md:max-w-[220px]"
+              error={getFieldError('downloads.datasheetMimeType')}
+            >
               <input
                 value={form.downloads.datasheetMimeType}
                 onChange={(event) => updateNestedField('downloads', 'datasheetMimeType', event.target.value)}
+                onBlur={() => validateByFieldName('downloads.datasheetMimeType')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
           </div>
         </section>
 

@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import useFormValidation from '../../../hooks/useFormValidation'
+import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
+import { buildBannerHubRowEditorSchema } from './BannerHubRowEditorDrawer.schema'
 
 const BannerHubRowEditorDrawer = ({
   isOpen,
@@ -7,12 +10,16 @@ const BannerHubRowEditorDrawer = ({
   onClose,
   onApply,
 }) => {
+  const { getFieldError, validateField, validateMany, clearAll } = useFormValidation()
   const [draft, setDraft] = useState(() => item)
   const [previewUrl, setPreviewUrl] = useState(() => item?.backgroundImageUrl?.trim() ?? '')
   const [previewState, setPreviewState] = useState(() =>
     item?.backgroundImageUrl?.trim() ? 'loading' : 'idle'
   )
+  const [errorMessage, setErrorMessage] = useState('')
+  const [validationErrors, setValidationErrors] = useState([])
   const blurTimerRef = useRef(null)
+  const validationSchema = buildBannerHubRowEditorSchema({ tab })
 
   useEffect(() => {
     return () => {
@@ -26,6 +33,25 @@ const BannerHubRowEditorDrawer = ({
 
   const update = (field, value) => {
     setDraft((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const apply = () => {
+    const quickValid = validateMany(
+      validationSchema.map((field) => ({
+        name: field.name,
+        validate: () => validateSchemaField(validationSchema, draft, field.name),
+      }))
+    )
+    const validation = validateSchema(validationSchema, draft)
+    if (!quickValid || !validation.valid) {
+      setErrorMessage('Please fix validation errors before apply.')
+      setValidationErrors(validation.errors)
+      return
+    }
+    setErrorMessage('')
+    setValidationErrors([])
+    clearAll()
+    onApply(draft)
   }
 
   const syncPreviewAfterBlur = () => {
@@ -69,42 +95,70 @@ const BannerHubRowEditorDrawer = ({
 
         <div className="mt-5 space-y-4">
           <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Eyebrow</span>
+            <span className="font-medium text-slate-700">
+              Eyebrow<span className="ml-1 text-red-500">*</span>
+            </span>
             <input
               value={draft.eyebrow ?? ''}
               onChange={(event) => update('eyebrow', event.target.value)}
+              onBlur={() => validateField('eyebrow', () => validateSchemaField(validationSchema, draft, 'eyebrow'))}
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
             />
+            {getFieldError('eyebrow') ? <p className="text-xs text-red-600">{getFieldError('eyebrow')}</p> : null}
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Title</span>
+            <span className="font-medium text-slate-700">
+              Title<span className="ml-1 text-red-500">*</span>
+            </span>
             <input
               value={draft.title ?? ''}
               onChange={(event) => update('title', event.target.value)}
+              onBlur={() => validateField('title', () => validateSchemaField(validationSchema, draft, 'title'))}
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
             />
+            {getFieldError('title') ? <p className="text-xs text-red-600">{getFieldError('title')}</p> : null}
           </label>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Description</span>
+            <span className="font-medium text-slate-700">
+              Description<span className="ml-1 text-red-500">*</span>
+            </span>
             <textarea
               rows={4}
               value={draft.description ?? ''}
               onChange={(event) => update('description', event.target.value)}
+              onBlur={() =>
+                validateField('description', () =>
+                  validateSchemaField(validationSchema, draft, 'description')
+                )
+              }
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
             />
+            {getFieldError('description') ? (
+              <p className="text-xs text-red-600">{getFieldError('description')}</p>
+            ) : null}
           </label>
 
           {tab === 'detail' || tab === 'product' ? (
             <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Background Image URL</span>
+              <span className="font-medium text-slate-700">
+                Background Image URL<span className="ml-1 text-red-500">*</span>
+              </span>
               <input
                 value={draft.backgroundImageUrl ?? ''}
                 onChange={(event) => update('backgroundImageUrl', event.target.value)}
-                onBlur={syncPreviewAfterBlur}
+                onBlur={() => {
+                  syncPreviewAfterBlur()
+                  validateField('backgroundImageUrl', () =>
+                    validateSchemaField(validationSchema, draft, 'backgroundImageUrl')
+                  )
+                }}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
+              {getFieldError('backgroundImageUrl') ? (
+                <p className="text-xs text-red-600">{getFieldError('backgroundImageUrl')}</p>
+              ) : null}
             </label>
           ) : null}
 
@@ -149,12 +203,21 @@ const BannerHubRowEditorDrawer = ({
               />
             </label>
           ) : null}
+
+          {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
+          {validationErrors.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5 text-xs text-red-600">
+              {validationErrors.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         <div className="mt-6 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onApply(draft)}
+            onClick={apply}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
           >
             Apply

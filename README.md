@@ -124,6 +124,47 @@ Initial endpoints (planned):
 - Keep dependencies version-aligned with `idtech-clone` when possible.
 - Prioritize stable, testable flows before adding extra features.
 
+## Form Validation Mechanism
+
+This project now uses a schema-driven validation system (Element Plus style UX with React implementation).
+
+### Layered design
+
+- `src/utils/formValidation.js`
+  - Pure predicate helpers (`isRequired`, `isEmail`, `isPhoneLoose`, `isUrlLike`, etc.)
+- `src/utils/validation/rules.js`
+  - Reusable rule factories with messages (`requiredRule`, `emailRule`, `enumRule`, `customRule`, etc.)
+- `src/utils/validation/engine.js`
+  - Schema execution engine (`validateSchema`, `validateSchemaField`, path-based value access)
+- `src/hooks/useFormValidation.js`
+  - UI state handling (`touched`, `errors`, `validateField`, `validateMany`, `clearAll`)
+- `src/components/common/FormField.jsx`
+  - Shared field wrapper: required star (`*`) + inline error text
+- Page-local schema file (example):
+  - `src/components/pages/contact/ContactPageEditor.schema.js`
+  - Keeps page-specific rules and error messages near the page itself
+
+### UX behavior
+
+- Required fields show a red `*`.
+- Field-level validation starts after focus/blur (`touched`).
+- Save action runs full schema validation and renders an error summary.
+- Cross-field or list-level rules are supported via `customRule` in schema.
+
+### How to add validation for a new page
+
+1. Create a page schema file near the page (e.g. `ProductEditorPage.schema.js`).
+2. Define each field as `{ name, valuePath?, rules: [...] }`.
+3. Import `validateSchemaField` for blur validation and `validateSchema` for save validation.
+4. Reuse `FormField` and `useFormValidation` for consistent UI behavior.
+
+### Notes
+
+- Keep common/primitive checks in `formValidation.js`.
+- Keep reusable message-aware rules in `rules.js`.
+- Keep page business constraints (especially cross-field) in page schema.
+- Frontend validation improves UX; backend validation remains mandatory.
+
 ## Next Action
 
 Start M1 implementation:
