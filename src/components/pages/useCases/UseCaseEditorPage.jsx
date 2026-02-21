@@ -2,12 +2,16 @@ import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../../features/auth/AuthProvider'
+import FormField from '../../common/FormField'
+import useFormValidation from '../../../hooks/useFormValidation'
 import {
   createBackstageUseCase,
   fetchBackstageUseCaseBySlug,
   fetchBackstageUseCaseProductOptions,
   updateBackstageUseCase,
 } from '../../../api/backstageContentUseCasesApi'
+import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
+import { buildUseCaseEditorValidationSchema } from './UseCaseEditorPage.schema'
 
 const buildInitialForm = () => ({
   title: '',
@@ -22,10 +26,12 @@ const UseCaseEditorPage = ({ mode }) => {
   const navigate = useNavigate()
   const { slug } = useParams()
   const { user } = useAuth()
+  const { clearAll, getFieldError, validateField, validateMany } = useFormValidation()
   const editorId = useMemo(() => user?.email ?? user?.name ?? 'unknown-editor', [user])
 
   const [status, setStatus] = useState('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [validationErrors, setValidationErrors] = useState([])
   const [optionsErrorMessage, setOptionsErrorMessage] = useState('')
   const [currentSlug, setCurrentSlug] = useState(slug ?? '')
   const [form, setForm] = useState(buildInitialForm)
@@ -40,6 +46,10 @@ const UseCaseEditorPage = ({ mode }) => {
   const [selectedQuery, setSelectedQuery] = useState('')
   const [availableChecked, setAvailableChecked] = useState([])
   const [selectedChecked, setSelectedChecked] = useState([])
+  const validationSchema = useMemo(() => buildUseCaseEditorValidationSchema(form), [form])
+
+  const validateByFieldName = (fieldName) =>
+    validateField(fieldName, () => validateSchemaField(validationSchema, form, fieldName))
 
   useEffect(() => {
     const loadProductOptions = async () => {
@@ -63,6 +73,7 @@ const UseCaseEditorPage = ({ mode }) => {
     const load = async () => {
       setStatus('loading')
       setErrorMessage('')
+      setValidationErrors([])
 
       try {
         const payload = await fetchBackstageUseCaseBySlug(slug)
@@ -86,6 +97,7 @@ const UseCaseEditorPage = ({ mode }) => {
         if (!nextPreview) setBackgroundPreviewState('idle')
 
         setStatus('success')
+        clearAll()
       } catch (error) {
         setStatus('error')
         setErrorMessage(error.message || 'Unable to load use case')
@@ -93,7 +105,7 @@ const UseCaseEditorPage = ({ mode }) => {
     }
 
     load()
-  }, [mode, slug])
+  }, [clearAll, mode, slug])
 
   useEffect(() => {
     return () => {
@@ -236,8 +248,23 @@ const UseCaseEditorPage = ({ mode }) => {
 
   const submit = async (event) => {
     event.preventDefault()
+    const quickValid = validateMany(
+      validationSchema.map((field) => ({
+        name: field.name,
+        validate: () => validateSchemaField(validationSchema, form, field.name),
+      })),
+    )
+    const validation = validateSchema(validationSchema, form)
+    if (!quickValid || !validation.valid) {
+      setStatus('error')
+      setErrorMessage('Please fix the validation errors before saving.')
+      setValidationErrors(validation.errors)
+      return
+    }
+
     setStatus('saving')
     setErrorMessage('')
+    setValidationErrors([])
 
     try {
       const payload = {
@@ -302,7 +329,16 @@ const UseCaseEditorPage = ({ mode }) => {
       </div>
 
       {errorMessage ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</div>
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p>{errorMessage}</p>
+          {validationErrors.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {validationErrors.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
       {optionsErrorMessage ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
@@ -314,53 +350,68 @@ const UseCaseEditorPage = ({ mode }) => {
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Basic</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Title *</span>
+            <FormField label="Title" required error={getFieldError('title')}>
               <input
                 value={form.title}
                 onChange={(event) => updateField('title', event.target.value)}
-                required
+                onBlur={() => validateByFieldName('title')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Slug</span>
+            <FormField label="Slug">
               <input
                 value={mode === 'edit' ? currentSlug : '(Auto generated after create)'}
                 readOnly
                 className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-slate-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Subtitle</span>
+            <FormField
+              label="Subtitle"
+              required
+              className="md:col-span-2"
+              error={getFieldError('subtitle')}
+            >
               <input
                 value={form.subtitle}
                 onChange={(event) => updateField('subtitle', event.target.value)}
+                onBlur={() => validateByFieldName('subtitle')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Description</span>
+            <FormField
+              label="Description"
+              required
+              className="md:col-span-2"
+              error={getFieldError('description')}
+            >
               <textarea
                 rows={4}
                 value={form.description}
                 onChange={(event) => updateField('description', event.target.value)}
+                onBlur={() => validateByFieldName('description')}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Background Image URL</span>
+            <FormField
+              label="Background Image URL"
+              required
+              className="md:col-span-2"
+              error={getFieldError('heroImageUrl')}
+            >
               <input
                 value={form.heroImageUrl}
                 onChange={(event) => updateField('heroImageUrl', event.target.value)}
-                onBlur={syncBackgroundPreviewAfterBlur}
+                onBlur={() => {
+                  syncBackgroundPreviewAfterBlur()
+                  validateByFieldName('heroImageUrl')
+                }}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
             <div className="space-y-1 text-sm md:col-span-2">
               <p className="font-medium text-slate-700">Background Preview</p>
@@ -392,17 +443,21 @@ const UseCaseEditorPage = ({ mode }) => {
               )}
             </div>
 
-            <label className="block space-y-1 text-sm md:max-w-[220px]">
-              <span className="font-medium text-slate-700">Status</span>
+            <FormField
+              label="Status"
+              className="md:max-w-[220px]"
+              error={getFieldError('status')}
+            >
               <select
                 value={form.status}
                 onChange={(event) => updateField('status', event.target.value)}
+                onBlur={() => validateByFieldName('status')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               >
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
               </select>
-            </label>
+            </FormField>
           </div>
         </section>
 

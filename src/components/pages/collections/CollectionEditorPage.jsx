@@ -2,12 +2,16 @@ import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../../features/auth/AuthProvider'
+import FormField from '../../common/FormField'
+import useFormValidation from '../../../hooks/useFormValidation'
 import {
   createBackstageCollection,
   fetchBackstageCollectionBySlug,
   fetchBackstageProductOptions,
   updateBackstageCollection,
 } from '../../../api/backstageContentCollectionsApi'
+import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
+import { buildCollectionEditorValidationSchema } from './CollectionEditorPage.schema'
 
 const buildInitialForm = () => ({
   name: '',
@@ -23,10 +27,12 @@ const CollectionEditorPage = ({ mode }) => {
   const navigate = useNavigate()
   const { slug } = useParams()
   const { user } = useAuth()
+  const { clearAll, getFieldError, validateField, validateMany } = useFormValidation()
   const editorId = useMemo(() => user?.email ?? user?.name ?? 'unknown-editor', [user])
 
   const [status, setStatus] = useState('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [validationErrors, setValidationErrors] = useState([])
   const [optionsErrorMessage, setOptionsErrorMessage] = useState('')
   const [currentSlug, setCurrentSlug] = useState(slug ?? '')
   const [form, setForm] = useState(buildInitialForm)
@@ -41,6 +47,10 @@ const CollectionEditorPage = ({ mode }) => {
   const [selectedQuery, setSelectedQuery] = useState('')
   const [availableChecked, setAvailableChecked] = useState([])
   const [selectedChecked, setSelectedChecked] = useState([])
+  const validationSchema = useMemo(() => buildCollectionEditorValidationSchema(form), [form])
+
+  const validateByFieldName = (fieldName) =>
+    validateField(fieldName, () => validateSchemaField(validationSchema, form, fieldName))
 
   useEffect(() => {
     const loadProductOptions = async () => {
@@ -64,6 +74,7 @@ const CollectionEditorPage = ({ mode }) => {
     const load = async () => {
       setStatus('loading')
       setErrorMessage('')
+      setValidationErrors([])
 
       try {
         const payload = await fetchBackstageCollectionBySlug(slug)
@@ -88,6 +99,7 @@ const CollectionEditorPage = ({ mode }) => {
         if (!nextPreview) setBackgroundPreviewState('idle')
 
         setStatus('success')
+        clearAll()
       } catch (error) {
         setStatus('error')
         setErrorMessage(error.message || 'Unable to load collection')
@@ -95,7 +107,7 @@ const CollectionEditorPage = ({ mode }) => {
     }
 
     load()
-  }, [mode, slug])
+  }, [clearAll, mode, slug])
 
   useEffect(() => {
     return () => {
@@ -238,8 +250,23 @@ const CollectionEditorPage = ({ mode }) => {
 
   const submit = async (event) => {
     event.preventDefault()
+    const quickValid = validateMany(
+      validationSchema.map((field) => ({
+        name: field.name,
+        validate: () => validateSchemaField(validationSchema, form, field.name),
+      }))
+    )
+    const validation = validateSchema(validationSchema, form)
+    if (!quickValid || !validation.valid) {
+      setStatus('error')
+      setErrorMessage('Please fix the validation errors before saving.')
+      setValidationErrors(validation.errors)
+      return
+    }
+
     setStatus('saving')
     setErrorMessage('')
+    setValidationErrors([])
 
     try {
       const payload = {
@@ -304,7 +331,16 @@ const CollectionEditorPage = ({ mode }) => {
       </div>
 
       {errorMessage ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</div>
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p>{errorMessage}</p>
+          {validationErrors.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {validationErrors.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
       {optionsErrorMessage ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
@@ -316,62 +352,72 @@ const CollectionEditorPage = ({ mode }) => {
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Basic</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Name *</span>
+            <FormField label="Name" required error={getFieldError('name')}>
               <input
                 value={form.name}
                 onChange={(event) => updateField('name', event.target.value)}
-                required
+                onBlur={() => validateByFieldName('name')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Slug</span>
+            <FormField label="Slug">
               <input
                 value={mode === 'edit' ? currentSlug : '(Auto generated after create)'}
                 readOnly
                 className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-slate-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Hero Title</span>
+            <FormField label="Hero Title" required error={getFieldError('heroTitle')}>
               <input
                 value={form.heroTitle}
                 onChange={(event) => updateField('heroTitle', event.target.value)}
+                onBlur={() => validateByFieldName('heroTitle')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Hero Subtitle</span>
+            <FormField label="Hero Subtitle" required error={getFieldError('heroSubtitle')}>
               <input
                 value={form.heroSubtitle}
                 onChange={(event) => updateField('heroSubtitle', event.target.value)}
+                onBlur={() => validateByFieldName('heroSubtitle')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Intro</span>
+            <FormField
+              label="Intro"
+              required
+              className="md:col-span-2"
+              error={getFieldError('intro')}
+            >
               <textarea
                 rows={4}
                 value={form.intro}
                 onChange={(event) => updateField('intro', event.target.value)}
+                onBlur={() => validateByFieldName('intro')}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
-            <label className="block space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Background Image URL</span>
+            <FormField
+              label="Background Image URL"
+              required
+              className="md:col-span-2"
+              error={getFieldError('imageUrl')}
+            >
               <input
                 value={form.imageUrl}
                 onChange={(event) => updateField('imageUrl', event.target.value)}
-                onBlur={syncBackgroundPreviewAfterBlur}
+                onBlur={() => {
+                  syncBackgroundPreviewAfterBlur()
+                  validateByFieldName('imageUrl')
+                }}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               />
-            </label>
+            </FormField>
 
             <div className="space-y-1 text-sm md:col-span-2">
               <p className="font-medium text-slate-700">Background Preview</p>
@@ -403,17 +449,21 @@ const CollectionEditorPage = ({ mode }) => {
               )}
             </div>
 
-            <label className="block space-y-1 text-sm md:max-w-[220px]">
-              <span className="font-medium text-slate-700">Status</span>
+            <FormField
+              label="Status"
+              className="md:max-w-[220px]"
+              error={getFieldError('status')}
+            >
               <select
                 value={form.status}
                 onChange={(event) => updateField('status', event.target.value)}
+                onBlur={() => validateByFieldName('status')}
                 className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
               >
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
               </select>
-            </label>
+            </FormField>
           </div>
         </section>
 
