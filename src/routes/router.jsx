@@ -23,6 +23,7 @@ import CompanyAboutUsPageManager from '../pages/contentTypes/CompanyAboutUsPageM
 import CompanyCareersPageManager from '../pages/contentTypes/CompanyCareersPageManager'
 import CompanyCareerCreatePageManager from '../pages/contentTypes/CompanyCareerCreatePageManager'
 import CompanyCareerEditPageManager from '../pages/contentTypes/CompanyCareerEditPageManager'
+import SeoPageManager from '../pages/seo/SeoPageManager'
 import PlaceholderPage from '../pages/PlaceholderPage'
 import RequireAuth from './guards/RequireAuth'
 import RequireGuest from './guards/RequireGuest'
@@ -222,6 +223,7 @@ const pageRoutes = [
     title: 'SEO Manager',
     description: 'Global and page-level SEO controls.',
     primaryNav: 'seo',
+    element: <SeoPageManager />,
   },
   {
     path: 'settings',

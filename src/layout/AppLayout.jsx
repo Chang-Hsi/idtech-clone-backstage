@@ -2,6 +2,7 @@ import { useMatches } from 'react-router-dom'
 import AppMainWorkspace from '../components/layouts/AppMainWorkspace'
 import AppPrimarySidebar from '../components/layouts/AppPrimarySidebar'
 import AppSecondarySidebar from '../components/layouts/AppSecondarySidebar'
+import AppSeoSidebar from '../components/layouts/AppSeoSidebar'
 import { PRIMARY_NAV_ITEMS, SECONDARY_NAV_CONFIG } from '../components/layouts/layoutNavigation'
 import { useAuth } from '../features/auth/AuthProvider'
 
@@ -12,6 +13,8 @@ const AppLayout = () => {
   const primaryNavKey = current?.handle?.primaryNav ?? 'pages'
   const secondaryNavKey = current?.handle?.secondaryNav
   const secondaryNavConfig = secondaryNavKey ? SECONDARY_NAV_CONFIG[secondaryNavKey] : null
+  const shouldShowSeoSidebar = primaryNavKey === 'seo'
+  const hasSidebar = Boolean(secondaryNavConfig) || shouldShowSeoSidebar
 
   return (
     <div className="flex min-h-screen bg-white text-slate-800">
@@ -22,7 +25,8 @@ const AppLayout = () => {
         onLogout={logout}
       />
       <AppSecondarySidebar config={secondaryNavConfig} />
-      <AppMainWorkspace hasSecondarySidebar={Boolean(secondaryNavConfig)} />
+      {shouldShowSeoSidebar ? <AppSeoSidebar /> : null}
+      <AppMainWorkspace hasSecondarySidebar={hasSidebar} />
     </div>
   )
 }

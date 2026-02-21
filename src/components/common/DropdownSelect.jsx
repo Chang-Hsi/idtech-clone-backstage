@@ -19,6 +19,16 @@ const DropdownSelect = ({
   }, [options, value, placeholder])
 
   useEffect(() => {
+    const handleCloseAll = () => {
+      if (isOpen) onBlur?.()
+      setIsOpen(false)
+    }
+
+    window.addEventListener('ui:close-popovers', handleCloseAll)
+    return () => window.removeEventListener('ui:close-popovers', handleCloseAll)
+  }, [isOpen, onBlur])
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (!rootRef.current) return
       if (!rootRef.current.contains(event.target)) {
@@ -56,7 +66,7 @@ const DropdownSelect = ({
 
       {isOpen && !disabled ? (
         <div
-          className="fade-down-in absolute z-30 mt-1 w-full rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+          className="fade-down-in absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white py-1 shadow-lg"
           style={{ '--anim-distance': '10px', '--anim-duration': '180ms' }}
         >
           <button
