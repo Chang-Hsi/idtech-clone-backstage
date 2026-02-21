@@ -51,7 +51,7 @@ Dashboard 定位為「總覽與入口」：
 4. Last 7 Days Updates
 5. SEO Issues（可選）
 
-每張卡可點擊跳轉對應模組，例如草稿卡跳去 `pages/content/articles?status=draft`。
+每張卡可點擊跳轉對應模組，例如草稿卡跳去 `pages/content/resources?status=draft`。
 
 ## 4.3 Recent Activity
 

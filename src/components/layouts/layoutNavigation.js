@@ -23,7 +23,7 @@ export const SECONDARY_NAV_CONFIG = {
           { label: 'Home', to: '/pages/home' },
           { label: 'Banner Hub', to: '/pages/banner-hub' },
           { label: 'Contact', to: '/pages/contact' },
-          { label: 'Legal', to: '/pages/legal' },
+          { label: 'Privacy Policy', to: '/pages/legal' },
         ],
       },
       {
@@ -33,9 +33,14 @@ export const SECONDARY_NAV_CONFIG = {
           { label: 'Collections', to: '/pages/content/collections' },
           { label: 'Use Cases', to: '/pages/content/use-cases' },
           { label: 'Resources', to: '/pages/content/resources' },
-          { label: 'Company Cards', to: '/pages/content/company' },
-          { label: 'Articles', to: '/pages/content/articles' },
-          { label: 'Jobs', to: '/pages/content/jobs' },
+          {
+            label: 'Company',
+            children: [
+              { label: 'Company Cards', to: '/pages/content/company/cards' },
+              { label: 'About Us', to: '/pages/content/company/about-us' },
+              { label: 'Careers', to: '/pages/content/company/careers' },
+            ],
+          },
         ],
       },
     ],

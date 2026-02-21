@@ -194,7 +194,12 @@ export const buildContactValidationSchema = (form) => {
 
   const inquiryOptions = Array.isArray(form?.inquiryOptions) ? form.inquiryOptions : []
   const allowedTypes = INQUIRY_TYPE_OPTIONS.map((item) => item.value)
-  const seenNames = new Set()
+  const nameCounts = inquiryOptions.reduce((acc, option) => {
+    const key = String(option?.name ?? '').trim().toLowerCase()
+    if (!key) return acc
+    acc.set(key, (acc.get(key) ?? 0) + 1)
+    return acc
+  }, new Map())
 
   for (const [index, option] of inquiryOptions.entries()) {
     const optionLabel = `Inquiry Option ${index + 1}`
@@ -208,9 +213,9 @@ export const buildContactValidationSchema = (form) => {
         safeLabelRule(`${optionLabel}: name has unsupported special characters.`),
         customRule(() => {
           if (!nameKey) return ''
-          if (seenNames.has(nameKey)) return `${optionLabel}: duplicate name is not allowed.`
-          seenNames.add(nameKey)
-          return ''
+          return (nameCounts.get(nameKey) ?? 0) > 1
+            ? `${optionLabel}: duplicate name is not allowed.`
+            : ''
         }, 'duplicateName'),
       ],
     })

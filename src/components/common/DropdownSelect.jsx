@@ -6,6 +6,8 @@ const DropdownSelect = ({
   options = [],
   placeholder = 'Choose here',
   onChange,
+  onBlur,
+  disabled = false,
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -20,16 +22,18 @@ const DropdownSelect = ({
     const handleClickOutside = (event) => {
       if (!rootRef.current) return
       if (!rootRef.current.contains(event.target)) {
+        if (isOpen) onBlur?.()
         setIsOpen(false)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen, onBlur])
 
   const handleSelect = (nextValue) => {
     onChange?.(nextValue)
+    onBlur?.()
     setIsOpen(false)
   }
 
@@ -37,14 +41,20 @@ const DropdownSelect = ({
     <div ref={rootRef} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="flex h-10 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 text-left text-sm text-slate-700 hover:border-slate-400"
+        onClick={() => {
+          if (disabled) return
+          setIsOpen((prev) => !prev)
+        }}
+        disabled={disabled}
+        className={`flex h-10 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 text-left text-sm text-slate-700 hover:border-slate-400 ${
+          disabled ? 'cursor-not-allowed bg-slate-100 text-slate-400 hover:border-slate-300' : ''
+        }`}
       >
         <span className="truncate">{selectedLabel}</span>
         <ChevronDownIcon className={`h-4 w-4 text-slate-500 transition ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {isOpen ? (
+      {isOpen && !disabled ? (
         <div
           className="fade-down-in absolute z-30 mt-1 w-full rounded-md border border-slate-200 bg-white py-1 shadow-lg"
           style={{ '--anim-distance': '10px', '--anim-duration': '180ms' }}

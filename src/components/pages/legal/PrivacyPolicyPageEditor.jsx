@@ -3,6 +3,9 @@ import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
 import '@uiw/react-markdown-preview/markdown.css'
 import { useAuth } from '../../../features/auth/AuthProvider'
+import FormField from '../../common/FormField'
+import DatePickerField from '../../common/DatePickerField'
+import StatusMessage from '../../common/StatusMessage'
 import {
   fetchBackstagePrivacyPolicyPage,
   updateBackstagePrivacyPolicyPage,
@@ -99,14 +102,20 @@ const PrivacyPolicyPageEditor = () => {
         {updatedAt ? <p className="mt-2 text-xs text-slate-500">Last updated: {updatedAt}</p> : null}
       </div>
 
-      {errorMessage ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</div>
-      ) : null}
-      {successMessage ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          {successMessage}
+      <StatusMessage tone="error" message={errorMessage} />
+      <StatusMessage tone="success" message={successMessage} />
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900">Document Meta</h2>
+        <div className="mt-4 grid gap-4 md:max-w-[320px]">
+          <FormField label="Effective Date">
+            <DatePickerField
+              value={form.effectiveDate}
+              onChange={(nextValue) => updateField('effectiveDate', nextValue)}
+            />
+          </FormField>
         </div>
-      ) : null}
+      </section>
 
       <section className="grid gap-4 xl:grid-cols-1">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

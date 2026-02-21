@@ -5,15 +5,15 @@ import StatusMessage from '../../common/StatusMessage'
 import ConfirmDialog from '../../dialog/ConfirmDialog'
 import { useAuth } from '../../../features/auth/AuthProvider'
 import {
-  archiveBackstageUseCase,
-  fetchBackstageUseCases,
-  restoreBackstageUseCase,
-} from '../../../api/backstageContentUseCasesApi'
+  archiveBackstageResource,
+  fetchBackstageResources,
+  restoreBackstageResource,
+} from '../../../api/backstageContentResourcesApi'
 
 const TAB_ACTIVE = 'active'
 const TAB_ARCHIVED = 'archived'
 
-const UseCasesContentList = () => {
+const ResourcesContentList = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const editorId = useMemo(() => user?.email ?? user?.name ?? 'unknown-editor', [user])
@@ -27,15 +27,14 @@ const UseCasesContentList = () => {
   const [actionTarget, setActionTarget] = useState(null)
   const [pagination, setPagination] = useState({ limit: 10, offset: 0, totalCount: 0 })
 
-  const loadUseCases = useCallback(async ({ limit, offset, q, status }) => {
+  const loadResources = useCallback(async ({ limit, offset, q, status }) => {
     setStatus('loading')
     setErrorMessage('')
 
     try {
-      const payload = await fetchBackstageUseCases({ limit, offset, q, status })
+      const payload = await fetchBackstageResources({ limit, offset, q, status })
       const data = payload?.data ?? {}
       const page = data?.pagination ?? {}
-
       setItems(Array.isArray(data?.items) ? data.items : [])
       setPagination({
         limit: Number.isFinite(page?.limit) ? page.limit : limit,
@@ -45,22 +44,21 @@ const UseCasesContentList = () => {
       setStatus('success')
     } catch (error) {
       setStatus('error')
-      setErrorMessage(error.message || 'Unable to load use cases.')
+      setErrorMessage(error.message || 'Unable to load resources.')
     }
   }, [])
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
-      loadUseCases({
+      loadResources({
         limit: pagination.limit,
         offset: 0,
         q: query,
         status: activeTab,
       })
     }, 0)
-
     return () => window.clearTimeout(timerId)
-  }, [activeTab, query, pagination.limit, loadUseCases])
+  }, [activeTab, query, pagination.limit, loadResources])
 
   const handleSearchSubmit = (event) => {
     event.preventDefault()
@@ -69,7 +67,7 @@ const UseCasesContentList = () => {
 
   const handlePageChange = (page) => {
     const nextOffset = (page - 1) * pagination.limit
-    loadUseCases({
+    loadResources({
       limit: pagination.limit,
       offset: nextOffset,
       q: query,
@@ -78,7 +76,7 @@ const UseCasesContentList = () => {
   }
 
   const handleLimitChange = (limit) => {
-    loadUseCases({
+    loadResources({
       limit,
       offset: 0,
       q: query,
@@ -94,10 +92,9 @@ const UseCasesContentList = () => {
 
     setStatus('saving')
     setErrorMessage('')
-
     try {
-      await restoreBackstageUseCase(item.slug, editorId)
-      loadUseCases({
+      await restoreBackstageResource(item.slug, editorId)
+      loadResources({
         limit: pagination.limit,
         offset: pagination.offset,
         q: query,
@@ -105,19 +102,19 @@ const UseCasesContentList = () => {
       })
     } catch (error) {
       setStatus('error')
-      setErrorMessage(error.message || 'Unable to update use case status.')
+      setErrorMessage(error.message || 'Unable to update resource status.')
     }
   }
 
   const confirmArchive = async () => {
     if (!actionTarget?.slug) return
+
     setStatus('saving')
     setErrorMessage('')
-
     try {
-      await archiveBackstageUseCase(actionTarget.slug, editorId)
+      await archiveBackstageResource(actionTarget.slug, editorId)
       setActionTarget(null)
-      loadUseCases({
+      loadResources({
         limit: pagination.limit,
         offset: pagination.offset,
         q: query,
@@ -125,7 +122,7 @@ const UseCasesContentList = () => {
       })
     } catch (error) {
       setStatus('error')
-      setErrorMessage(error.message || 'Unable to update use case status.')
+      setErrorMessage(error.message || 'Unable to update resource status.')
     }
   }
 
@@ -146,13 +143,13 @@ const UseCasesContentList = () => {
     <section className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900">Use Cases</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Resources</h1>
           <button
             type="button"
-            onClick={() => navigate('/pages/content/use-cases/new')}
+            onClick={() => navigate('/pages/content/resources/new')}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
           >
-            New Use Case
+            New Resource
           </button>
         </div>
 
@@ -186,7 +183,7 @@ const UseCasesContentList = () => {
             type="search"
             value={queryInput}
             onChange={(event) => setQueryInput(event.target.value)}
-            placeholder="Search by title or slug"
+            placeholder="Search by title, excerpt, or slug"
             className="h-10 w-full max-w-sm rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-indigo-500"
           />
           <button
@@ -200,49 +197,55 @@ const UseCasesContentList = () => {
 
       <StatusMessage tone="error" message={errorMessage} />
       {status === 'loading' ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">Loading use cases...</div>
+        <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">Loading resources...</div>
       ) : null}
 
       {status !== 'loading' ? (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-[900px] table-auto border-collapse text-left text-sm text-slate-700">
+            <table className="min-w-[1080px] table-auto border-collapse text-left text-sm text-slate-700">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="w-[48px] px-4 py-3">ID</th>
                   <th className="w-[120px] px-4 py-3">Image</th>
-                  <th className="w-[180px] px-4 py-3">Title</th>
-                  <th className="w-[180px] px-4 py-3">Slug</th>
-                  <th className="w-[180px] px-4 py-3">Products</th>
-                  <th className="w-[180px] px-4 py-3">Updated At</th>
-                  <th className="w-[320px] px-4 py-3">Status</th>
+                  <th className="w-[220px] px-4 py-3">Title</th>
+                  <th className="w-[220px] px-4 py-3">Slug</th>
+                  <th className="w-[140px] px-4 py-3">Published At</th>
+                  <th className="w-[140px] px-4 py-3">Updated At</th>
+                  <th className="w-[220px] px-4 py-3">Updated By</th>
+                  <th className="w-[160px] px-4 py-3">Status</th>
                   <th className="w-[180px] px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                      No use cases found.
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                      No resources found.
                     </td>
                   </tr>
                 ) : (
                   items.map((item, index) => (
                     <tr key={item.slug} className="border-t border-slate-200">
                       <td className="px-4 py-3 align-middle text-slate-500">{pagination.offset + index + 1}</td>
-                      <td className="px-4 py-3 align-middle">{renderImage(item.imageUrl, item.title)}</td>
-                      <td className="max-w-[280px] px-4 py-3 align-middle">
-                        <p className="truncate font-medium text-slate-900" title={item.title}>
-                          {item.title}
+                      <td className="px-4 py-3 align-middle">{renderImage(item.coverImageUrl, item.previewTitle)}</td>
+                      <td className="max-w-[320px] px-4 py-3 align-middle">
+                        <p className="truncate font-medium text-slate-900" title={item.previewTitle}>
+                          {item.previewTitle}
                         </p>
                       </td>
-                      <td className="max-w-[240px] px-4 py-3 align-middle text-slate-600">
+                      <td className="max-w-[260px] px-4 py-3 align-middle text-slate-600">
                         <p className="truncate" title={item.slug}>
                           {item.slug}
                         </p>
                       </td>
-                      <td className="px-4 py-3 align-middle text-slate-600">{item.productsCount ?? 0}</td>
+                      <td className="px-4 py-3 align-middle text-slate-600">{item.publishedAt || '-'}</td>
                       <td className="px-4 py-3 align-middle text-slate-600">{item.updatedAtLabel ?? '-'}</td>
+                      <td className="max-w-[260px] px-4 py-3 align-middle text-slate-600">
+                        <p className="truncate" title={item.updatedBy ?? '-'}>
+                          {item.updatedBy ?? '-'}
+                        </p>
+                      </td>
                       <td className="px-4 py-3 align-middle">
                         <span
                           className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
@@ -258,7 +261,7 @@ const UseCasesContentList = () => {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => navigate(`/pages/content/use-cases/${item.slug}/edit`)}
+                            onClick={() => navigate(`/pages/content/resources/${item.slug}/edit`)}
                             className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                           >
                             Edit
@@ -294,8 +297,8 @@ const UseCasesContentList = () => {
 
       <ConfirmDialog
         isOpen={Boolean(actionTarget)}
-        title="Archive use case?"
-        description={`"${actionTarget?.title ?? ''}" will be archived and moved to Archived tab.`}
+        title="Archive resource?"
+        description={`"${actionTarget?.previewTitle ?? ''}" will be archived and moved to Archived tab.`}
         confirmLabel="Archive"
         onCancel={() => setActionTarget(null)}
         onConfirm={confirmArchive}
@@ -304,4 +307,4 @@ const UseCasesContentList = () => {
   )
 }
 
-export default UseCasesContentList
+export default ResourcesContentList

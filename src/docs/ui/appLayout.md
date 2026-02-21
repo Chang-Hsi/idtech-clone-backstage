@@ -55,9 +55,15 @@
 目前分組：
 
 1. Page Types（頁面型）
-   - Home / Products / Use Cases / Resources / Company / Contact / Legal
+   - Home / Banner Hub / Contact / Legal
 2. Content Types（內容型）
-   - Products / Collections / Articles / Jobs
+   - Products / Collections / Use Cases / Resources / Company（可展開）
+
+Company 子目錄（展開）：
+
+- Company Cards
+- About Us
+- Careers
 
 ### 2.4 Main Workspace
 
@@ -102,9 +108,9 @@ Main 區塊為主要編輯區域：
 - `/pages/content/collections/:slug/edit`
 - `/pages/content/use-cases`
 - `/pages/content/resources`
-- `/pages/content/company`
-- `/pages/content/articles`
-- `/pages/content/jobs`
+- `/pages/content/company/cards`
+- `/pages/content/company/about-us`
+- `/pages/content/company/careers`
 - `/seo`
 - `/settings`
 
@@ -141,6 +147,9 @@ src/
       CollectionsContentPageManager.jsx
       CollectionCreatePageManager.jsx
       CollectionEditPageManager.jsx
+      CompanyCardsContentPageManager.jsx
+      CompanyAboutUsPageManager.jsx
+      CompanyCareersPageManager.jsx
     LoginPage.jsx
     PlaceholderPage.jsx
 
@@ -187,6 +196,7 @@ src/
 3. 以 `Pages` 模組優先實作真實 CRUD 頁面
 4. 將 `SEO` 模組接入後端 API
 5. 規劃主/子導航配置後端化（第二階段）
+6. Company 子目錄目前先採固定路由（不依 card 動態產生 sidebar 項目）
 
 ## 8. 備註
 

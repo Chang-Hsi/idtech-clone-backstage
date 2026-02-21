@@ -111,6 +111,18 @@ body,
   }
 }
 
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(var(--anim-distance, 32px));
+  }
+}
+
 .slide-left-in {
   animation: slideInLeft var(--anim-duration, 700ms)
     var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
@@ -156,6 +168,11 @@ body,
     var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
 }
 
+.fade-down-out {
+  animation: fadeOutDown var(--anim-duration, 700ms)
+    var(--anim-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--anim-delay, 0ms) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .slide-left-in,
   .slide-right-in,
@@ -165,7 +182,8 @@ body,
   .fade-left-in,
   .fade-right-in,
   .fade-up-in,
-  .fade-down-in {
+  .fade-down-in,
+  .fade-down-out {
     animation: none;
   }
 }
