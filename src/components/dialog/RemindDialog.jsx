@@ -1,3 +1,6 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
+
 const RemindDialog = ({
   isOpen,
   title,
@@ -7,9 +10,13 @@ const RemindDialog = ({
 }) => {
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="fade-up-in w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('ui:close-popovers'))
+  }, [])
+
+  return createPortal(
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/55 p-4">
+      <div className="fade-up-in z-[301] w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
         <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
         <p className="mt-2 text-sm text-slate-600">{description}</p>
 
@@ -23,7 +30,8 @@ const RemindDialog = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
