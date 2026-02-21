@@ -15,6 +15,14 @@ import CollectionEditPageManager from '../pages/contentTypes/CollectionEditPageM
 import UseCasesContentPageManager from '../pages/contentTypes/UseCasesContentPageManager'
 import UseCaseCreatePageManager from '../pages/contentTypes/UseCaseCreatePageManager'
 import UseCaseEditPageManager from '../pages/contentTypes/UseCaseEditPageManager'
+import ResourcesContentPageManager from '../pages/contentTypes/ResourcesContentPageManager'
+import ResourceCreatePageManager from '../pages/contentTypes/ResourceCreatePageManager'
+import ResourceEditPageManager from '../pages/contentTypes/ResourceEditPageManager'
+import CompanyCardsContentPageManager from '../pages/contentTypes/CompanyCardsContentPageManager'
+import CompanyAboutUsPageManager from '../pages/contentTypes/CompanyAboutUsPageManager'
+import CompanyCareersPageManager from '../pages/contentTypes/CompanyCareersPageManager'
+import CompanyCareerCreatePageManager from '../pages/contentTypes/CompanyCareerCreatePageManager'
+import CompanyCareerEditPageManager from '../pages/contentTypes/CompanyCareerEditPageManager'
 import PlaceholderPage from '../pages/PlaceholderPage'
 import RequireAuth from './guards/RequireAuth'
 import RequireGuest from './guards/RequireGuest'
@@ -136,20 +144,71 @@ const pageRoutes = [
     description: 'Content-type management for resource cards and published resource entries.',
     primaryNav: 'pages',
     secondaryNav: 'pages',
+    element: <ResourcesContentPageManager />,
+  },
+  {
+    path: 'pages/content/resources/new',
+    title: 'Create Resource',
+    description: 'Create a new resource entry.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <ResourceCreatePageManager />,
+  },
+  {
+    path: 'pages/content/resources/:slug/edit',
+    title: 'Edit Resource',
+    description: 'Edit resource entry.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <ResourceEditPageManager />,
   },
   {
     path: 'pages/content/company',
+    title: 'Company',
+    description: 'Company content group entry. Redirects to Company Cards.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <Navigate to="/pages/content/company/cards" replace />,
+  },
+  {
+    path: 'pages/content/company/cards',
     title: 'Company Cards (Entity)',
     description: 'Content-type management for company section cards and related links.',
     primaryNav: 'pages',
     secondaryNav: 'pages',
+    element: <CompanyCardsContentPageManager />,
   },
   {
-    path: 'pages/content/articles',
-    title: 'Articles (Content Type)',
-    description: 'Content-type management for resource articles.',
+    path: 'pages/content/company/about-us',
+    title: 'About Us (Entity)',
+    description: 'Content-type management for About Us page content.',
     primaryNav: 'pages',
     secondaryNav: 'pages',
+    element: <CompanyAboutUsPageManager />,
+  },
+  {
+    path: 'pages/content/company/careers',
+    title: 'Careers (Entity)',
+    description: 'Content-type management for Careers page content.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <CompanyCareersPageManager />,
+  },
+  {
+    path: 'pages/content/company/careers/new',
+    title: 'Create Career Job',
+    description: 'Create a new career job.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <CompanyCareerCreatePageManager />,
+  },
+  {
+    path: 'pages/content/company/careers/:slug/edit',
+    title: 'Edit Career Job',
+    description: 'Edit a career job.',
+    primaryNav: 'pages',
+    secondaryNav: 'pages',
+    element: <CompanyCareerEditPageManager />,
   },
   {
     path: 'pages/content/jobs',

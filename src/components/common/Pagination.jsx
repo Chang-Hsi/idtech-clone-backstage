@@ -5,15 +5,11 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/24/outline'
 
-const DEFAULT_ROWS_OPTIONS = [10, 20, 50]
-
 const Pagination = ({
   totalCount = 0,
   limit = 10,
   offset = 0,
-  rowsPerPageOptions = DEFAULT_ROWS_OPTIONS,
   onPageChange,
-  onLimitChange,
 }) => {
   const safeLimit = limit > 0 ? limit : 10
   const totalPages = Math.max(1, Math.ceil(totalCount / safeLimit))
@@ -87,18 +83,6 @@ const Pagination = ({
       >
         <ChevronDoubleRightIcon className="h-4 w-4" />
       </button>
-
-      <select
-        value={safeLimit}
-        onChange={(event) => onLimitChange?.(Number(event.target.value))}
-        className="ml-2 h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
-      >
-        {rowsPerPageOptions.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
     </div>
   )
 }
