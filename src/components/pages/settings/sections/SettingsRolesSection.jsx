@@ -4,7 +4,6 @@ import DropdownSelect from '../../../common/DropdownSelect'
 const SettingsRolesSection = ({
   settings,
   selectedRole,
-  selectedRoleId,
   setSelectedRoleId,
   setRoleRadarDialog,
   setSettings,
