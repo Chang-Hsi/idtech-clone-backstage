@@ -85,8 +85,15 @@ jobs:
           JSON
           )
 
-          curl --fail --show-error --silent \
+          http_code=$(curl --silent --show-error \
+            -o /tmp/metrics-response.json \
+            -w "%{http_code}" \
             -X PUT "${BACKEND_BASE_URL}/api/internal/dashboard/testing-health" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${DASHBOARD_METRICS_INGEST_TOKEN}" \
-            -d "${payload}"
+            -d "${payload}")
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Metrics ingest failed with HTTP ${http_code}"
+            cat /tmp/metrics-response.json
+            exit 1
+          fi
