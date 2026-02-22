@@ -50,6 +50,10 @@ const emptySettings = {
   profile: { displayName: '', email: '', avatarUrl: '', lastLoginAt: null },
   roles: [],
   employees: [],
+  employeeFilters: {
+    regions: [],
+    careersByRegion: {},
+  },
   securityPolicies: {
     passwordMinLength: 8,
     requireUppercase: true,
@@ -215,6 +219,8 @@ const SettingsManagerPage = () => {
   const [employeeQuery, setEmployeeQuery] = useState('')
   const [employeeStatusFilter, setEmployeeStatusFilter] = useState('all')
   const [employeeRoleFilter, setEmployeeRoleFilter] = useState('all')
+  const [employeeRegionFilter, setEmployeeRegionFilter] = useState('all')
+  const [employeeCareerFilter, setEmployeeCareerFilter] = useState('all')
   const [employeePage, setEmployeePage] = useState(1)
   const [savedSecurityPolicies, setSavedSecurityPolicies] = useState(emptySettings.securityPolicies)
   const [employeeDialog, setEmployeeDialog] = useState({
@@ -618,6 +624,7 @@ const SettingsManagerPage = () => {
     [settings.roles],
   )
   const careersPage = settings?.careersPage
+  const settingsEmployeeFilters = settings?.employeeFilters
   const employeeRegionOptions = useMemo(() => {
     const tabs = Array.isArray(careersPage?.tabs) ? careersPage.tabs : []
     return tabs
@@ -628,6 +635,17 @@ const SettingsManagerPage = () => {
       }))
       .filter((option) => option.value)
   }, [careersPage])
+  const employeeRegionFilterOptions = useMemo(() => {
+    const rawOptions = Array.isArray(settingsEmployeeFilters?.regions) ? settingsEmployeeFilters.regions : []
+    const fromSettings = rawOptions
+      .map((option) => ({
+        value: String(option?.value ?? '').trim().toLowerCase(),
+        label: String(option?.label ?? '').trim(),
+      }))
+      .filter((option) => option.value)
+    if (fromSettings.length > 0) return fromSettings
+    return employeeRegionOptions
+  }, [settingsEmployeeFilters, employeeRegionOptions])
   const employeeCareerOptionsByRegion = useMemo(() => {
     const jobs = Array.isArray(careersPage?.jobs) ? careersPage.jobs : []
     return jobs.reduce((acc, job) => {
@@ -639,6 +657,38 @@ const SettingsManagerPage = () => {
       return acc
     }, {})
   }, [careersPage])
+  const employeeCareerFilterOptionsByRegion = useMemo(() => {
+    const fromSettings = settingsEmployeeFilters?.careersByRegion
+    if (!fromSettings || typeof fromSettings !== 'object') return {}
+    return Object.entries(fromSettings).reduce((acc, [regionCode, titles]) => {
+      const normalizedRegionCode = String(regionCode ?? '').trim().toLowerCase()
+      if (!normalizedRegionCode) return acc
+      const titleSet = new Set(
+        (Array.isArray(titles) ? titles : []).map((title) => String(title ?? '').trim()).filter(Boolean),
+      )
+      if (titleSet.size > 0) {
+        acc[normalizedRegionCode] = titleSet
+      }
+      return acc
+    }, {})
+  }, [settingsEmployeeFilters])
+  const employeeCareerFilterOptions = useMemo(() => {
+    const sourceMap = Object.keys(employeeCareerFilterOptionsByRegion).length > 0
+      ? employeeCareerFilterOptionsByRegion
+      : employeeCareerOptionsByRegion
+    if (employeeRegionFilter === 'all') {
+      const allCareers = new Set()
+      Object.values(sourceMap).forEach((titles) => {
+        ;(titles ?? []).forEach((title) => {
+          const normalizedTitle = String(title ?? '').trim()
+          if (normalizedTitle) allCareers.add(normalizedTitle)
+        })
+      })
+      return Array.from(allCareers).map((title) => ({ value: title, label: title }))
+    }
+    const selectedCareers = sourceMap[employeeRegionFilter] ?? new Set()
+    return Array.from(selectedCareers).map((title) => ({ value: title, label: title }))
+  }, [employeeCareerFilterOptionsByRegion, employeeCareerOptionsByRegion, employeeRegionFilter])
   const selectedRegionCode = String(employeeDialog.regionCode ?? '').trim().toLowerCase()
   const employeeCareerOptions = useMemo(() => {
     const careerSet = employeeCareerOptionsByRegion[selectedRegionCode] ?? new Set()
@@ -650,6 +700,8 @@ const SettingsManagerPage = () => {
       .filter((employee) => {
         if (employeeStatusFilter !== 'all' && employee.status !== employeeStatusFilter) return false
         if (employeeRoleFilter !== 'all' && !employee.roleIds.includes(employeeRoleFilter)) return false
+        if (employeeRegionFilter !== 'all' && String(employee.regionCode ?? '').trim().toLowerCase() !== employeeRegionFilter) return false
+        if (employeeCareerFilter !== 'all' && String(employee.careerTitle ?? '').trim() !== employeeCareerFilter) return false
         if (!keyword) return true
         const haystack = `${employee.displayName} ${employee.email} ${employee.id} ${employee.regionCode ?? ''} ${employee.careerTitle ?? ''}`.toLowerCase()
         return haystack.includes(keyword)
@@ -659,7 +711,7 @@ const SettingsManagerPage = () => {
         const bTime = Number.isFinite(Date.parse(b?.lastLoginAt ?? '')) ? Date.parse(b.lastLoginAt) : 0
         return bTime - aTime || String(a.displayName).localeCompare(String(b.displayName))
       })
-  }, [settings.employees, employeeQuery, employeeStatusFilter, employeeRoleFilter])
+  }, [settings.employees, employeeQuery, employeeStatusFilter, employeeRoleFilter, employeeRegionFilter, employeeCareerFilter])
   const employeeTotalCount = filteredEmployees.length
   const employeeTotalPages = Math.max(1, Math.ceil(employeeTotalCount / EMPLOYEE_PAGE_SIZE))
   const normalizedEmployeePage = employeePage > employeeTotalPages ? employeeTotalPages : employeePage
@@ -950,6 +1002,12 @@ const SettingsManagerPage = () => {
           employeeRoleFilter={employeeRoleFilter}
           employeeRoleOptions={employeeRoleOptions}
           setEmployeeRoleFilter={setEmployeeRoleFilter}
+          employeeRegionFilter={employeeRegionFilter}
+          employeeRegionFilterOptions={employeeRegionFilterOptions}
+          setEmployeeRegionFilter={setEmployeeRegionFilter}
+          employeeCareerFilter={employeeCareerFilter}
+          employeeCareerFilterOptions={employeeCareerFilterOptions}
+          setEmployeeCareerFilter={setEmployeeCareerFilter}
           employeeStatusFilter={employeeStatusFilter}
           setEmployeeStatusFilter={setEmployeeStatusFilter}
           setEmployeePage={setEmployeePage}

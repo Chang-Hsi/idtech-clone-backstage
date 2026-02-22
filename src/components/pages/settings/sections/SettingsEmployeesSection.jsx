@@ -19,6 +19,12 @@ const SettingsEmployeesSection = ({
   employeeRoleFilter,
   employeeRoleOptions,
   setEmployeeRoleFilter,
+  employeeRegionFilter,
+  employeeRegionFilterOptions,
+  setEmployeeRegionFilter,
+  employeeCareerFilter,
+  employeeCareerFilterOptions,
+  setEmployeeCareerFilter,
   employeeStatusFilter,
   setEmployeeStatusFilter,
   setEmployeePage,
@@ -58,7 +64,10 @@ const SettingsEmployeesSection = ({
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <form onSubmit={handleEmployeeSearchSubmit} className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_180px_180px_96px]">
+        <form
+          onSubmit={handleEmployeeSearchSubmit}
+          className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_160px_160px_220px_160px_96px]"
+        >
           <div className="relative">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -76,6 +85,24 @@ const SettingsEmployeesSection = ({
               setEmployeeRoleFilter(nextValue || 'all')
               setEmployeePage(1)
             }}
+          />
+          <DropdownSelect
+            value={employeeRegionFilter}
+            options={[{ value: 'all', label: 'All Regions' }, ...employeeRegionFilterOptions]}
+            onChange={(nextValue) => {
+              setEmployeeRegionFilter(nextValue || 'all')
+              setEmployeeCareerFilter('all')
+              setEmployeePage(1)
+            }}
+          />
+          <DropdownSelect
+            value={employeeCareerFilter}
+            options={[{ value: 'all', label: 'All Careers' }, ...employeeCareerFilterOptions]}
+            onChange={(nextValue) => {
+              setEmployeeCareerFilter(nextValue || 'all')
+              setEmployeePage(1)
+            }}
+            disabled={employeeCareerFilterOptions.length === 0}
           />
           <DropdownSelect
             value={employeeStatusFilter}
