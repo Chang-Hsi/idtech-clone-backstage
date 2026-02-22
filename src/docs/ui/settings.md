@@ -197,6 +197,29 @@ Settings 模組改為「系統治理中心」，不重複 SEO 功能。
 5. Audit
 - `GET /api/backstage/settings/audit-logs`
 
+### 6.1 目前實作狀態（2026-02）
+
+為避免與舊草案混淆，以下為目前後端已落地的 Settings API 形態：
+
+1. Aggregated Settings API（已實作）
+- `GET /api/backstage/settings`
+- `PUT /api/backstage/settings/profile`
+- `PUT /api/backstage/settings/profile/password`
+- `PUT /api/backstage/settings/roles`
+- `PUT /api/backstage/settings/employees`
+- `POST /api/backstage/settings/employees/:employeeId/reset-password`
+- `PUT /api/backstage/settings/security-policies`
+- `GET /api/backstage/settings/audit-logs`
+
+2. Auth API（已實作）
+- `POST /api/backstage/auth/login`
+- `POST /api/backstage/auth/logout`
+- `GET /api/backstage/auth/me`
+
+3. 舊草案中「逐資源 CRUD 端點」（目前未採用）
+- 例如 `POST /api/backstage/settings/roles`、`PUT /api/backstage/settings/roles/:roleId`
+- 目前實際策略是「以單一 PUT 寫回整個模組資料」，由後端做 schema 驗證與審計紀錄
+
 ## 7. 驗證與規則
 
 1. 角色不可刪除「最後一個 admin 角色」。
@@ -381,3 +404,50 @@ Settings 模組改為「系統治理中心」，不重複 SEO 功能。
 
 1. 不可讓系統失去最後一個 `settings.rbac:admin` 角色
 2. 不可讓系統失去最後一位具 `settings.rbac:admin` 的 active 員工
+
+## 15. Settings Manager 重構落地（已完成）
+
+本次針對 `SettingsManagerPage.jsx` 進行「不改 API、只改前端結構與 UI」的落地重構。
+
+### 15.1 重構目標
+
+1. 降低單檔過長造成的維護風險
+2. 讓 Profile / Roles / Employees / Security / Audit 可獨立維護
+3. 保留既有 API 與行為，不引入後端變更風險
+
+### 15.2 組件拆分結果
+
+原本單一頁面承載所有子頁內容，現已拆為 section 元件：
+
+1. `src/components/pages/settings/sections/SettingsProfileSection.jsx`
+2. `src/components/pages/settings/sections/SettingsRolesSection.jsx`
+3. `src/components/pages/settings/sections/SettingsEmployeesSection.jsx`
+4. `src/components/pages/settings/sections/SettingsSecuritySection.jsx`
+5. `src/components/pages/settings/sections/SettingsAuditSection.jsx`
+
+容器頁 `src/components/pages/settings/SettingsManagerPage.jsx` 現在主要負責：
+
+1. 資料載入與保存流程（load/save）
+2. 共用狀態管理（status/message/dialog）
+3. 路由 section 切換與 props 傳遞
+
+### 15.3 Security UI 新樣式（已落地）
+
+1. Security 區塊改為 Password Policy 視覺
+2. 輸入欄位改為浮動標籤（floating label）互動
+3. 保留既有 Update API，新增前端 Reset 與 Reset To Default 互動
+4. `Reset` 回到最近一次載入/儲存值；`Reset To Default` 回前端預設值
+
+### 15.4 通用元件化（已落地）
+
+新增共用輸入組件：
+
+1. `src/components/common/FloatingLabelInput.jsx`
+
+目前已先套用於 Security Policy 的數字欄位，後續其他頁可直接 import 重用，達成視覺與互動一致。
+
+### 15.5 兼容性與驗證策略
+
+1. 每個 section 拆分後立即進行 build 驗證
+2. 重構期間不調整 API payload 與後端契約
+3. 以「逐段拆分、逐段驗證」確保不破壞既有功能
