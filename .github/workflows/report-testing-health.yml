@@ -5,11 +5,23 @@ on:
 
 jobs:
   report:
-    if: ${{ secrets.BACKEND_BASE_URL != '' && secrets.DASHBOARD_METRICS_INGEST_TOKEN != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
+          DASHBOARD_METRICS_INGEST_TOKEN: ${{ secrets.DASHBOARD_METRICS_INGEST_TOKEN }}
+        run: |
+          missing=()
+          [ -z "$BACKEND_BASE_URL" ] && missing+=("BACKEND_BASE_URL")
+          [ -z "$DASHBOARD_METRICS_INGEST_TOKEN" ] && missing+=("DASHBOARD_METRICS_INGEST_TOKEN")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
