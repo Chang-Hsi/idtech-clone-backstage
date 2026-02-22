@@ -9,6 +9,8 @@ import { fetchBackstageCompanyCareers } from '../../../api/backstageCompanyCaree
 import { fetchBackstageSettings, fetchBackstageSettingsAuditLogs } from '../../../api/backstageSettingsApi'
 import { fetchBackstageSeoTargets } from '../../../api/backstageSeoApi'
 
+const WORLD_MAP_PATH = `${import.meta.env.BASE_URL}maps/countries.geojson`
+
 const REGION_NAME_FALLBACK = {
   tw: 'Taiwan',
   jp: 'Japan',
@@ -153,7 +155,7 @@ export default function useDashboardData({ user, permissions }) {
         fetchBackstageSettings(),
         fetchBackstageSettingsAuditLogs(),
         fetchBackstageSeoTargets({ limit: 200, offset: 0 }),
-        fetch('/maps/countries.geojson', { cache: 'force-cache' }).then((response) => {
+        fetch(WORLD_MAP_PATH, { cache: 'force-cache' }).then((response) => {
           if (!response.ok) throw new Error('Unable to load world map data.')
           return response.json()
         }),
