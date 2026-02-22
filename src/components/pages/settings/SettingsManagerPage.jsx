@@ -1,32 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  ClockIcon,
-  DocumentDuplicateIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  KeyIcon,
-  MagnifyingGlassIcon,
-  PencilSquareIcon,
-  PresentationChartLineIcon,
-  ShieldCheckIcon,
-  ShieldExclamationIcon,
-  UserCircleIcon,
-  ArchiveBoxIcon,
-  ArrowPathIcon,
-  PlusIcon,
-  TrashIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../features/auth/AuthProvider'
-import DropdownSelect from '../../common/DropdownSelect'
-import FormField from '../../common/FormField'
-import Pagination from '../../common/Pagination'
 import StatusMessage from '../../common/StatusMessage'
 import CredentialsDialog from '../../dialog/CredentialsDialog'
 import ConfirmDialog from '../../dialog/ConfirmDialog'
 import RemindDialog from '../../dialog/RemindDialog'
 import RolePermissionRadarDialog from '../../dialog/RolePermissionRadarDialog'
+import SettingsAuditSection from './sections/SettingsAuditSection'
+import SettingsEmployeesSection from './sections/SettingsEmployeesSection'
+import SettingsProfileSection from './sections/SettingsProfileSection'
+import SettingsRolesSection from './sections/SettingsRolesSection'
+import SettingsSecuritySection from './sections/SettingsSecuritySection'
 import {
   fetchBackstageSettings,
   fetchBackstageSettingsAuditLogs,
@@ -140,6 +124,19 @@ const statusOptions = [
 ]
 const PROFILE_ACTIVITY_PAGE_SIZE = 5
 const EMPLOYEE_PAGE_SIZE = 10
+const SECURITY_NUMERIC_FIELDS = [
+  { key: 'passwordMinLength', label: 'Minimum password length', min: 8 },
+  { key: 'passwordExpireDays', label: 'Password expiry period (days)', min: 0 },
+  { key: 'maxLoginAttempts', label: 'Maximum failed login attempts', min: 3 },
+  { key: 'lockoutMinutes', label: 'Account lockout duration (minutes)', min: 1 },
+  { key: 'sessionTimeoutMinutes', label: 'Session timeout (minutes)', min: 5 },
+]
+const SECURITY_BOOLEAN_FIELDS = [
+  { key: 'requireUppercase', label: 'Require uppercase letters' },
+  { key: 'requireLowercase', label: 'Require lowercase letters' },
+  { key: 'requireNumber', label: 'Require numeric characters' },
+  { key: 'requireSymbol', label: 'Require special characters' },
+]
 
 const getActiveSection = (pathname) => {
   const matched = Object.keys(ACTIVE_SECTIONS).find((route) => pathname.startsWith(route))
@@ -235,6 +232,7 @@ const SettingsManagerPage = () => {
   const [employeeStatusFilter, setEmployeeStatusFilter] = useState('all')
   const [employeeRoleFilter, setEmployeeRoleFilter] = useState('all')
   const [employeePage, setEmployeePage] = useState(1)
+  const [savedSecurityPolicies, setSavedSecurityPolicies] = useState(emptySettings.securityPolicies)
   const [employeeDialog, setEmployeeDialog] = useState({
     isOpen: false,
     mode: 'create',
@@ -339,6 +337,10 @@ const SettingsManagerPage = () => {
       if (!isMountedRef.current) return
       const responseSettings = payload?.data?.settings ?? emptySettings
       setSettings({ ...emptySettings, ...responseSettings, auditLogs: [] })
+      setSavedSecurityPolicies({
+        ...emptySettings.securityPolicies,
+        ...(responseSettings?.securityPolicies ?? {}),
+      })
       setUpdatedAt(payload?.data?.updatedAt ?? '')
       setUpdatedBy(payload?.data?.updatedBy ?? '')
 
@@ -533,6 +535,7 @@ const SettingsManagerPage = () => {
       })
       await load()
       if (!isMountedRef.current) return
+      setSavedSecurityPolicies({ ...settings.securityPolicies })
       setSuccessMessage('Security policies updated.')
       setStatus('success')
     } catch (error) {
@@ -540,6 +543,19 @@ const SettingsManagerPage = () => {
       setErrorMessage(error?.message || 'Unable to update security policies.')
       setStatus('error')
     }
+  }
+  const resetSecurity = () => {
+    setSettings((prev) => ({
+      ...prev,
+      securityPolicies: { ...savedSecurityPolicies },
+    }))
+  }
+
+  const resetSecurityToDefault = () => {
+    setSettings((prev) => ({
+      ...prev,
+      securityPolicies: { ...emptySettings.securityPolicies },
+    }))
   }
 
   const updateSelectedRole = (updater) => {
@@ -763,806 +779,115 @@ const SettingsManagerPage = () => {
       <StatusMessage tone="success" message={successMessage} />
 
       {activeSection === 'profile' ? (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Profile Settings</h2>
-          {mustResetPassword ? (
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              You must update your password before continuing to other pages.
-            </div>
-          ) : null}
-          <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <aside className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-col items-start gap-3">
-                {profileAvatarUrl && !avatarLoadError ? (
-                  <img
-                    src={profileAvatarUrl}
-                    alt="Profile avatar"
-                    onError={() => setAvatarLoadError(true)}
-                    className="h-24 w-24 rounded-full border border-slate-300 bg-white object-cover"
-                  />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-300 bg-white">
-                    <UserCircleIcon className="h-12 w-12 text-slate-500" />
-                  </div>
-                )}
-                <div>
-                  <p className="text-base font-semibold text-slate-900">{settings.profile.displayName || '-'}</p>
-                  <p className="mt-0.5 text-sm text-slate-600">{settings.profile.email || '-'}</p>
-                  {avatarLoadError ? (
-                    <p className="mt-1 text-xs text-amber-700">Avatar image could not be loaded.</p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-slate-500">
-                    Last sign in {formatDateTime(currentEmployee?.lastLoginAt)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs">
-                <span className="truncate text-slate-600">User ID: {user?.id || '-'}</span>
-                <button
-                  type="button"
-                  onClick={() => copyText(user?.id || '', 'profile-user-id')}
-                  className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-50"
-                >
-                  <DocumentDuplicateIcon className="h-3.5 w-3.5" />
-                  {copiedCredentialKey === 'profile-user-id' ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={handleJumpToPasswordCard}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-slate-700 transition hover:bg-white"
-                >
-                  <KeyIcon className="h-4 w-4" />
-                  Change Password
-                </button>
-                <div className="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-slate-700">
-                  <ShieldCheckIcon className="h-4 w-4" />
-                  Account: {currentEmployee?.status || 'active'}
-                </div>
-                <div className="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-slate-700">
-                  <ShieldExclamationIcon className="h-4 w-4" />
-                  Reset Required: {mustResetPassword ? 'Yes' : 'No'}
-                </div>
-              </div>
-
-              <div className="space-y-2 border-t border-slate-200 pt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Roles</p>
-                <div className="flex flex-wrap gap-2">
-                  {currentRoles.length > 0 ? (
-                    currentRoles.map((role) => (
-                      <span
-                        key={role.id}
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${getRoleTagClass(role)}`}
-                      >
-                        {role.name}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-500">No role assigned</span>
-                  )}
-                </div>
-              </div>
-            </aside>
-
-            <div className="space-y-4">
-              <section className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-semibold text-slate-900">Personal Information</h3>
-                  <button
-                    type="button"
-                    onClick={saveProfile}
-                    disabled={status === 'saving'}
-                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-                  >
-                    Save Profile
-                  </button>
-                </div>
-                <div className="mt-3 grid gap-4 md:grid-cols-2">
-                  <FormField label="Display Name" required>
-                    <input
-                      value={settings.profile.displayName}
-                      onChange={(event) =>
-                        setSettings((prev) => ({ ...prev, profile: { ...prev.profile, displayName: event.target.value } }))
-                      }
-                      placeholder="Enter your display name"
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-                    />
-                  </FormField>
-                  <FormField label="Email">
-                    <input
-                      value={settings.profile.email}
-                      disabled
-                      className="h-10 w-full rounded-md border border-slate-300 bg-slate-100 px-3 text-slate-500"
-                    />
-                  </FormField>
-                  <FormField label="Avatar URL" className="md:col-span-2" error={avatarUrlError}>
-                    <input
-                      value={settings.profile.avatarUrl || ''}
-                      onChange={(event) => {
-                        const nextValue = event.target.value
-                        setSettings((prev) => ({ ...prev, profile: { ...prev.profile, avatarUrl: nextValue } }))
-                        setAvatarLoadError(false)
-                        if (avatarUrlError && isValidHttpUrl(nextValue)) {
-                          setAvatarUrlError('')
-                        }
-                      }}
-                      onBlur={(event) => {
-                        const nextValue = event.target.value
-                        if (!isValidHttpUrl(nextValue)) {
-                          setAvatarUrlError('Avatar URL must start with http:// or https://')
-                        } else {
-                          setAvatarUrlError('')
-                        }
-                      }}
-                      placeholder="https://..."
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-                    />
-                  </FormField>
-                </div>
-              </section>
-
-              <section ref={passwordCardRef} className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-semibold text-slate-900">Account Security</h3>
-                  <button
-                    type="button"
-                    onClick={changePassword}
-                    disabled={status === 'saving'}
-                    className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-60"
-                  >
-                    Update Password
-                  </button>
-                </div>
-                <div className="mt-3 grid gap-4 md:grid-cols-2">
-                  <FormField label="Current Password" required>
-                    <div className="relative">
-                      <input
-                        ref={currentPasswordInputRef}
-                        type={showCurrentPassword ? 'text' : 'password'}
-                        value={passwordForm.currentPassword}
-                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, currentPassword: event.target.value }))}
-                        placeholder="Enter current password"
-                        className="h-10 w-full rounded-md border border-slate-300 px-3 pr-10 outline-none focus:border-indigo-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCurrentPassword((prev) => !prev)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:bg-slate-100"
-                        aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
-                      >
-                        {showCurrentPassword ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </FormField>
-                  <FormField label="New Password" required>
-                    <div className="relative">
-                      <input
-                        type={showNextPassword ? 'text' : 'password'}
-                        value={passwordForm.nextPassword}
-                        onChange={(event) => setPasswordForm((prev) => ({ ...prev, nextPassword: event.target.value }))}
-                        placeholder="Enter new password"
-                        className="h-10 w-full rounded-md border border-slate-300 px-3 pr-10 outline-none focus:border-indigo-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNextPassword((prev) => !prev)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:bg-slate-100"
-                        aria-label={showNextPassword ? 'Hide new password' : 'Show new password'}
-                      >
-                        {showNextPassword ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </FormField>
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2">
-                  <ShieldCheckIcon className="h-4 w-4 text-slate-600" />
-                  <h3 className="text-sm font-semibold text-slate-900">Permission Summary</h3>
-                </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                  <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-center">
-                    <p className="text-[11px] text-slate-500">Total</p>
-                    <p className="text-sm font-semibold text-slate-900">{permissionSummary.total}</p>
-                  </div>
-                  {[...SETTINGS_ACTIONS, { key: 'admin', label: 'Full Access' }].map((action) => (
-                    <div key={action.key} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-center">
-                      <p className="text-[11px] uppercase text-slate-500">{action.label}</p>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {permissionSummary.counters[action.key] ?? 0}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2">
-                  <ClockIcon className="h-4 w-4 text-slate-600" />
-                  <h3 className="text-sm font-semibold text-slate-900">My Activity</h3>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {profileActivityTotalCount > 0 ? (
-                    profileActivityPageItems.map((log) => (
-                      <div key={log.id} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                        <p className="text-sm font-medium text-slate-900">
-                          {formatProfileActivityLabel(log.action)}
-                        </p>
-                        <p className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-slate-500">No activity yet.</p>
-                  )}
-                </div>
-                {profileActivityTotalCount > PROFILE_ACTIVITY_PAGE_SIZE ? (
-                  <Pagination
-                    totalCount={profileActivityTotalCount}
-                    limit={PROFILE_ACTIVITY_PAGE_SIZE}
-                    offset={normalizedProfileActivityOffset}
-                    onPageChange={(page) => setProfileActivityPage(page)}
-                  />
-                ) : null}
-              </section>
-            </div>
-          </div>
-        </section>
+        <SettingsProfileSection
+          mustResetPassword={mustResetPassword}
+          profileAvatarUrl={profileAvatarUrl}
+          avatarLoadError={avatarLoadError}
+          setAvatarLoadError={setAvatarLoadError}
+          settings={settings}
+          currentEmployee={currentEmployee}
+          formatDateTime={formatDateTime}
+          user={user}
+          copyText={copyText}
+          copiedCredentialKey={copiedCredentialKey}
+          handleJumpToPasswordCard={handleJumpToPasswordCard}
+          currentRoles={currentRoles}
+          getRoleTagClass={getRoleTagClass}
+          saveProfile={saveProfile}
+          status={status}
+          setSettings={setSettings}
+          avatarUrlError={avatarUrlError}
+          setAvatarUrlError={setAvatarUrlError}
+          isValidHttpUrl={isValidHttpUrl}
+          passwordCardRef={passwordCardRef}
+          changePassword={changePassword}
+          currentPasswordInputRef={currentPasswordInputRef}
+          showCurrentPassword={showCurrentPassword}
+          setShowCurrentPassword={setShowCurrentPassword}
+          passwordForm={passwordForm}
+          setPasswordForm={setPasswordForm}
+          showNextPassword={showNextPassword}
+          setShowNextPassword={setShowNextPassword}
+          permissionSummary={permissionSummary}
+          settingsActions={SETTINGS_ACTIONS}
+          profileActivityTotalCount={profileActivityTotalCount}
+          profileActivityPageItems={profileActivityPageItems}
+          formatProfileActivityLabel={formatProfileActivityLabel}
+          profileActivityPageSize={PROFILE_ACTIVITY_PAGE_SIZE}
+          normalizedProfileActivityOffset={normalizedProfileActivityOffset}
+          setProfileActivityPage={setProfileActivityPage}
+        />
       ) : null}
 
       {activeSection === 'roles' ? (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">Roles & Permissions</h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const nextRole = {
-                    id: `role-${Date.now()}`,
-                    name: 'New Role',
-                    description: '',
-                    status: 'active',
-                    permissions: ['pages:read'],
-                  }
-                  setSettings((prev) => ({ ...prev, roles: [...prev.roles, nextRole] }))
-                  setSelectedRoleId(nextRole.id)
-                }}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Add Role
-              </button>
-              <button
-                type="button"
-                onClick={saveRoles}
-                disabled={status === 'saving'}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-              >
-                Save Roles
-              </button>
-            </div>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              {settings.roles.length === 0 ? (
-                <p className="text-sm text-slate-500">No roles yet. Create one to start permission setup.</p>
-              ) : null}
-              {settings.roles.map((role) => (
-                <div key={role.id} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRoleId(role.id)}
-                    className={`w-full rounded-md border px-3 py-2 pr-10 text-left text-sm ${
-                      selectedRole?.id === role.id
-                        ? 'border-indigo-300 bg-indigo-100 text-indigo-700'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <p className="font-medium">{role.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">{role.description || 'No description'}</p>
-                    <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${getRoleTagClass(role)}`}>
-                      {role.status}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setRoleRadarDialog({ isOpen: true, roleId: role.id })
-                    }}
-                    className="absolute right-2 top-2 rounded-md border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
-                    aria-label={`Open ${role.name} radar chart`}
-                  >
-                    <PresentationChartLineIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </aside>
-
-            {selectedRole ? (
-              <div className="space-y-3 rounded-lg border border-slate-200 p-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
-                    enforced
-                  </span>
-                </div>
-                <div className="grid gap-3 md:grid-cols-[1fr_180px_40px]">
-                  <div className="space-y-2">
-                    <input
-                      value={selectedRole.name}
-                      onChange={(event) => updateSelectedRole((role) => ({ ...role, name: event.target.value }))}
-                      placeholder="Role name"
-                      className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-indigo-500"
-                    />
-                    <textarea
-                      value={selectedRole.description}
-                      onChange={(event) => updateSelectedRole((role) => ({ ...role, description: event.target.value }))}
-                      rows={2}
-                      placeholder="Role description"
-                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  <DropdownSelect
-                    value={selectedRole.status}
-                    options={statusOptions}
-                    onChange={(nextValue) => updateSelectedRole((role) => ({ ...role, status: nextValue || 'active' }))}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={removeSelectedRole}
-                    className="mb-auto pt-2 text-slate-500 hover:bg-slate-50"
-                    aria-label="remove role"
-                  >
-                    <TrashIcon className="mx-auto h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="overflow-auto rounded-md border border-slate-200">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-slate-50 text-slate-600">
-                      <tr>
-                        <th className="w-[260px] px-3 py-2 text-left">Resource</th>
-                        <th className="w-[120px] px-3 py-2 text-left">Group</th>
-                        {SETTINGS_ACTIONS.map((action) => (
-                          <th key={action.key} className="px-3 py-2 text-center uppercase">
-                            {action.label}
-                          </th>
-                        ))}
-                        <th className="px-3 py-2 text-center">Full Access</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {SETTINGS_RESOURCES.map((resource) => {
-                        const fullAccessChecked = hasPermission(selectedRole.permissions, resource.key, 'admin')
-
-                        return (
-                          <tr key={resource.key} className="border-t border-slate-200">
-                            <td className="px-3 py-2 font-medium text-slate-700">
-                              <div className="flex items-center gap-2">
-                                <span>{resource.label}</span>
-                                <span
-                                  className={`ml-auto inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                                    resource.state === 'enforced'
-                                      ? 'bg-emerald-100 text-emerald-700'
-                                      : 'bg-slate-200 text-slate-600'
-                                  }`}
-                                >
-                                  {resource.state}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-slate-500">{resource.group}</td>
-                            {SETTINGS_ACTIONS.map((action) => {
-                              const checked = hasPermission(selectedRole.permissions, resource.key, action.key)
-                              return (
-                                <td key={`${resource.key}:${action.key}`} className="px-3 py-2 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    disabled={fullAccessChecked}
-                                    onChange={(event) =>
-                                      updateSelectedRole((role) => ({
-                                        ...role,
-                                        permissions: togglePermission(
-                                          role.permissions,
-                                          resource.key,
-                                          action.key,
-                                          event.target.checked,
-                                        ),
-                                      }))
-                                    }
-                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 disabled"
-                                  />
-                                </td>
-                              )
-                            })}
-                            <td className="px-3 py-2 text-center">
-                              <input
-                                type="checkbox"
-                                checked={fullAccessChecked}
-                                onChange={(event) =>
-                                  updateSelectedRole((role) => ({
-                                    ...role,
-                                    permissions: togglePermission(
-                                      role.permissions,
-                                      resource.key,
-                                      'admin',
-                                      event.target.checked,
-                                    ),
-                                  }))
-                                }
-                                className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-                              />
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-500">
-                Select a role from the left panel.
-              </div>
-            )}
-          </div>
-        </section>
+        <SettingsRolesSection
+          settings={settings}
+          selectedRole={selectedRole}
+          selectedRoleId={selectedRoleId}
+          setSelectedRoleId={setSelectedRoleId}
+          setRoleRadarDialog={setRoleRadarDialog}
+          setSettings={setSettings}
+          saveRoles={saveRoles}
+          status={status}
+          updateSelectedRole={updateSelectedRole}
+          removeSelectedRole={removeSelectedRole}
+          statusOptions={statusOptions}
+          settingsActions={SETTINGS_ACTIONS}
+          settingsResources={SETTINGS_RESOURCES}
+          hasPermission={hasPermission}
+          togglePermission={togglePermission}
+          getRoleTagClass={getRoleTagClass}
+        />
       ) : null}
 
       {activeSection === 'employees' ? (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-900">Employees</h2>
-            <button
-              type="button"
-              onClick={openCreateEmployeeDialog}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add Employee
-            </button>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <form onSubmit={handleEmployeeSearchSubmit} className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_180px_180px_96px]">
-              <div className="relative">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={employeeQueryInput}
-                  onChange={(event) => setEmployeeQueryInput(event.target.value)}
-                  placeholder="Search by name, email, or employee id"
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-indigo-500"
-                />
-              </div>
-              <DropdownSelect
-                value={employeeRoleFilter}
-                options={[{ value: 'all', label: 'All Roles' }, ...employeeRoleOptions]}
-                onChange={(nextValue) => {
-                  setEmployeeRoleFilter(nextValue || 'all')
-                  setEmployeePage(1)
-                }}
-              />
-              <DropdownSelect
-                value={employeeStatusFilter}
-                options={[
-                  { value: 'all', label: 'All Status' },
-                  { value: 'active', label: 'Active' },
-                  { value: 'archived', label: 'Archived' },
-                ]}
-                onChange={(nextValue) => {
-                  setEmployeeStatusFilter(nextValue || 'all')
-                  setEmployeePage(1)
-                }}
-              />
-              <button
-                type="submit"
-                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-100"
-              >
-                Search
-              </button>
-            </form>
-          </div>
-
-          <div className="rounded-lg border border-slate-200">
-            <div className="overflow-x-auto">
-              <table className="min-w-[980px] table-auto border-collapse text-left text-sm text-slate-700">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="w-[64px] px-4 py-3">ID</th>
-                    <th className="w-[180px] px-4 py-3">Name</th>
-                    <th className="w-[220px] px-4 py-3">Email</th>
-                    <th className="w-[220px] px-4 py-3">Employee ID</th>
-                    <th className="w-[180px] px-4 py-3">Role</th>
-                    <th className="w-[140px] px-4 py-3">Status</th>
-                    <th className="w-[180px] px-4 py-3">Last Login</th>
-                    <th className="w-[260px] pr-8 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedEmployees.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                        No employees found.
-                      </td>
-                    </tr>
-                  ) : (
-                    pagedEmployees.map((employee, index) => {
-                      const primaryRoleId = employee.roleIds?.[0] ?? ''
-                      const primaryRole = employeeRoleMap.get(primaryRoleId)
-                      return (
-                        <tr key={employee.id} className="border-t border-slate-200">
-                          <td className="px-4 py-3 align-middle text-slate-500">{employeeOffset + index + 1}</td>
-                          <td className="px-4 py-3 align-middle">
-                            <p className="font-medium text-slate-900">{employee.displayName || '-'}</p>
-                            {employee.forcePasswordReset ? (
-                              <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                                Must reset password
-                              </span>
-                            ) : null}
-                          </td>
-                          <td className="px-4 py-3 align-middle text-slate-600">{employee.email || '-'}</td>
-                          <td className="px-4 py-3 align-middle text-slate-600">{employee.id}</td>
-                          <td className="px-4 py-3 align-middle text-slate-600">{primaryRole?.name ?? '-'}</td>
-                          <td className="px-4 py-3 align-middle">
-                            <span
-                              className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                employee.status === 'archived'
-                                  ? 'bg-slate-200 text-slate-700'
-                                  : 'bg-emerald-100 text-emerald-700'
-                              }`}
-                            >
-                              {employee.status === 'archived' ? 'Archived' : 'Active'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 align-middle text-slate-600">
-                            {formatDateTime(employee.lastLoginAt)}
-                          </td>
-                          <td className="px-4 py-3 align-middle">
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="group relative">
-                                <button
-                                  type="button"
-                                  onClick={() => openEditEmployeeDialog(employee)}
-                                  aria-label="Edit"
-                                  className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                                >
-                                  <PencilSquareIcon className="h-4 w-4" />
-                                </button>
-                                <span className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100">
-                                  Edit
-                                </span>
-                              </div>
-
-                              <div className="group relative">
-                                <button
-                                  type="button"
-                                  onClick={() => requestResetEmployeePassword(employee)}
-                                  disabled={status === 'saving'}
-                                  aria-label="Reset Password"
-                                  className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60"
-                                >
-                                  <KeyIcon className="h-4 w-4" />
-                                </button>
-                                <span className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100">
-                                  Reset Password
-                                </span>
-                              </div>
-
-                              <div className="group relative">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleEmployeeArchive(employee)}
-                                  aria-label={employee.status === 'archived' ? 'Restore' : 'Archive'}
-                                  className={`rounded-md p-1.5 transition ${
-                                    employee.status === 'archived'
-                                      ? 'text-emerald-700 hover:bg-emerald-50'
-                                      : 'text-red-600 hover:bg-red-50'
-                                  }`}
-                                >
-                                  {employee.status === 'archived' ? (
-                                    <ArrowPathIcon className="h-4 w-4" />
-                                  ) : (
-                                    <ArchiveBoxIcon className="h-4 w-4" />
-                                  )}
-                                </button>
-                                <span className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100">
-                                  {employee.status === 'archived' ? 'Restore' : 'Archive'}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <Pagination
-              totalCount={employeeTotalCount}
-              limit={EMPLOYEE_PAGE_SIZE}
-              offset={employeeOffset}
-              onPageChange={(page) => setEmployeePage(page)}
-            />
-          </div>
-
-          {employeeDialog.isOpen ? (
-            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/55 p-4">
-              <div className="fade-up-in z-[301] w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-900">
-                    {employeeDialog.mode === 'create' ? 'Add Employee' : 'Edit Employee'}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={closeEmployeeDialog}
-                    className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
-                    aria-label="Close employee dialog"
-                  >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <FormField label="Display Name" required error={employeeDialogErrors.displayName}>
-                    <input
-                      value={employeeDialog.displayName}
-                      onChange={(event) => {
-                        setEmployeeDialog((prev) => ({ ...prev, displayName: event.target.value }))
-                        if (employeeDialogErrors.displayName) {
-                          setEmployeeDialogErrors((prev) => ({ ...prev, displayName: '' }))
-                        }
-                      }}
-                      placeholder="Enter display name"
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-                    />
-                  </FormField>
-                  <FormField label="Email" required error={employeeDialogErrors.email}>
-                    <input
-                      value={employeeDialog.email}
-                      onChange={(event) => {
-                        setEmployeeDialog((prev) => ({ ...prev, email: event.target.value }))
-                        if (employeeDialogErrors.email) {
-                          setEmployeeDialogErrors((prev) => ({ ...prev, email: '' }))
-                        }
-                      }}
-                      placeholder="name@company.com"
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-                    />
-                  </FormField>
-                  <FormField label="Role" required error={employeeDialogErrors.roleId}>
-                    <DropdownSelect
-                      value={employeeDialog.roleId}
-                      options={activeRoleOptions}
-                      onChange={(nextValue) => {
-                        setEmployeeDialog((prev) => ({ ...prev, roleId: nextValue || '' }))
-                        if (employeeDialogErrors.roleId) {
-                          setEmployeeDialogErrors((prev) => ({ ...prev, roleId: '' }))
-                        }
-                      }}
-                      placeholder="Select role"
-                    />
-                  </FormField>
-                  <FormField label="Status" required>
-                    <DropdownSelect
-                      value={employeeDialog.status}
-                      options={statusOptions}
-                      onChange={(nextValue) =>
-                        setEmployeeDialog((prev) => ({ ...prev, status: nextValue || 'active' }))
-                      }
-                    />
-                  </FormField>
-                </div>
-
-                <div className="mt-5 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={closeEmployeeDialog}
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveEmployeeDialog}
-                    disabled={status === 'saving'}
-                    className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </section>
+        <SettingsEmployeesSection
+          openCreateEmployeeDialog={openCreateEmployeeDialog}
+          handleEmployeeSearchSubmit={handleEmployeeSearchSubmit}
+          employeeQueryInput={employeeQueryInput}
+          setEmployeeQueryInput={setEmployeeQueryInput}
+          employeeRoleFilter={employeeRoleFilter}
+          employeeRoleOptions={employeeRoleOptions}
+          setEmployeeRoleFilter={setEmployeeRoleFilter}
+          employeeStatusFilter={employeeStatusFilter}
+          setEmployeeStatusFilter={setEmployeeStatusFilter}
+          setEmployeePage={setEmployeePage}
+          pagedEmployees={pagedEmployees}
+          employeeOffset={employeeOffset}
+          employeeRoleMap={employeeRoleMap}
+          formatDateTime={formatDateTime}
+          openEditEmployeeDialog={openEditEmployeeDialog}
+          requestResetEmployeePassword={requestResetEmployeePassword}
+          status={status}
+          toggleEmployeeArchive={toggleEmployeeArchive}
+          employeeTotalCount={employeeTotalCount}
+          employeePageSize={EMPLOYEE_PAGE_SIZE}
+          employeeDialog={employeeDialog}
+          closeEmployeeDialog={closeEmployeeDialog}
+          employeeDialogErrors={employeeDialogErrors}
+          setEmployeeDialog={setEmployeeDialog}
+          setEmployeeDialogErrors={setEmployeeDialogErrors}
+          activeRoleOptions={activeRoleOptions}
+          statusOptions={statusOptions}
+          saveEmployeeDialog={saveEmployeeDialog}
+        />
       ) : null}
 
       {activeSection === 'security' ? (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Security Policies</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {Object.entries(settings.securityPolicies).map(([key, value]) => {
-              const isBool = typeof value === 'boolean'
-              return (
-                <FormField key={key} label={key}>
-                  {isBool ? (
-                    <label className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(value)}
-                        onChange={(event) =>
-                          setSettings((prev) => ({
-                            ...prev,
-                            securityPolicies: {
-                              ...prev.securityPolicies,
-                              [key]: event.target.checked,
-                            },
-                          }))
-                        }
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-                      />
-                      Enabled
-                    </label>
-                  ) : (
-                    <input
-                      type="number"
-                      value={value}
-                      onChange={(event) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          securityPolicies: {
-                            ...prev.securityPolicies,
-                            [key]: Number(event.target.value),
-                          },
-                        }))
-                      }
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-                    />
-                  )}
-                </FormField>
-              )
-            })}
-          </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={saveSecurity}
-              disabled={status === 'saving'}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-            >
-              Save Security Policies
-            </button>
-          </div>
-        </section>
+        <SettingsSecuritySection
+          securityPolicies={settings.securityPolicies}
+          setSettings={setSettings}
+          securityNumericFields={SECURITY_NUMERIC_FIELDS}
+          securityBooleanFields={SECURITY_BOOLEAN_FIELDS}
+          saveSecurity={saveSecurity}
+          resetSecurity={resetSecurity}
+          resetSecurityToDefault={resetSecurityToDefault}
+          status={status}
+        />
       ) : null}
 
       {activeSection === 'audit' ? (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Audit Logs</h2>
-          <div className="space-y-2">
-            {settings.auditLogs.length === 0 ? (
-              <p className="text-sm text-slate-500">No audit logs yet.</p>
-            ) : (
-              settings.auditLogs.map((log) => (
-                <div key={log.id} className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-sm font-medium text-slate-900">{log.action}</p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    {formatDateTime(log.createdAt)} | actor: {log.actorId || '-'} | target: {log.targetType}:{log.targetId}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+        <SettingsAuditSection auditLogs={settings.auditLogs} formatDateTime={formatDateTime} />
       ) : null}
 
       <ConfirmDialog
