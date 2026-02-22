@@ -17,6 +17,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@heroicons/react": "^2.2.0",
+    "@nivo/geo": "^0.99.0",
     "@reduxjs/toolkit": "^2.11.2",
     "@uiw/react-md-editor": "^4.0.11",
     "react": "^19.2.0",

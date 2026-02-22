@@ -41,7 +41,9 @@ const DropdownSelect = ({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen, onBlur])
 
-  const handleSelect = (nextValue) => {
+  const handleSelect = (nextValue, event) => {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     onChange?.(nextValue)
     onBlur?.()
     setIsOpen(false)
@@ -68,10 +70,14 @@ const DropdownSelect = ({
         <div
           className="fade-down-in absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white py-1 shadow-lg"
           style={{ '--anim-distance': '10px', '--anim-duration': '180ms' }}
+          onMouseDown={(event) => {
+            // Keep focus on trigger and prevent click-through reopen.
+            event.preventDefault()
+          }}
         >
           <button
             type="button"
-            onClick={() => handleSelect('')}
+            onClick={(event) => handleSelect('', event)}
             className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
           >
             {placeholder}
@@ -80,7 +86,7 @@ const DropdownSelect = ({
             <button
               key={option.value}
               type="button"
-              onClick={() => handleSelect(option.value)}
+              onClick={(event) => handleSelect(option.value, event)}
               className={`block w-full px-4 py-2 text-left text-sm hover:bg-slate-100 ${
                 option.value === value ? 'font-semibold text-slate-900' : 'text-slate-700'
               }`}
