@@ -9,7 +9,7 @@ export const PRIMARY_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: HomeIcon },
   { key: 'pages', label: 'Pages', to: '/pages/home', icon: RectangleStackIcon },
   { key: 'seo', label: 'SEO', to: '/seo', icon: MagnifyingGlassIcon },
-  { key: 'settings', label: 'Settings', to: '/settings', icon: Cog6ToothIcon },
+  { key: 'settings', label: 'Settings', to: '/settings/profile', icon: Cog6ToothIcon },
 ]
 
 export const SECONDARY_NAV_CONFIG = {
@@ -41,6 +41,22 @@ export const SECONDARY_NAV_CONFIG = {
               { label: 'Careers', to: '/pages/content/company/careers' },
             ],
           },
+        ],
+      },
+    ],
+  },
+  settings: {
+    title: 'Settings',
+    searchEnabled: false,
+    groups: [
+      {
+        title: 'System',
+        items: [
+          { label: 'Profile', to: '/settings/profile' },
+          { label: 'Roles & Permissions', to: '/settings/roles' },
+          { label: 'Employees', to: '/settings/employees' },
+          { label: 'Security Policies', to: '/settings/security' },
+          { label: 'Audit Logs', to: '/settings/audit' },
         ],
       },
     ],

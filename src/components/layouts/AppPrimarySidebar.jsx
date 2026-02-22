@@ -42,7 +42,7 @@ const AppPrimarySidebar = ({ items, activeKey, user, onLogout }) => {
 
   const handleOpenProfileSettings = () => {
     setIsMenuOpen(false)
-    navigate('/settings')
+    navigate('/settings/profile')
   }
 
   const handleLogout = () => {
@@ -93,7 +93,7 @@ const AppPrimarySidebar = ({ items, activeKey, user, onLogout }) => {
               style={{ '--anim-distance': '10px', '--anim-duration': '180ms' }}
             >
               <div className="border-b border-slate-200 px-4 py-3">
-                <p className="text-base font-semibold leading-tight">{user?.name ?? 'Admin User'}</p>
+                <p className="text-base font-semibold leading-tight">{user?.displayName ?? user?.name ?? 'Admin User'}</p>
                 <p className="mt-1 text-sm text-slate-500">{user?.email ?? 'admin@idtech.local'}</p>
               </div>
               <div className="px-2 py-2">
@@ -123,9 +123,9 @@ const AppPrimarySidebar = ({ items, activeKey, user, onLogout }) => {
             aria-label="Account"
             aria-haspopup="menu"
             aria-expanded={isMenuOpen}
-            title={user?.name ?? 'Account'}
+            title={user?.displayName ?? user?.name ?? 'Account'}
           >
-            {getInitials(user?.name)}
+            {getInitials(user?.displayName ?? user?.name)}
           </button>
         </div>
       </div>

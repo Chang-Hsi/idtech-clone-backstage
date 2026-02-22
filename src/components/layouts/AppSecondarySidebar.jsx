@@ -38,14 +38,16 @@ const AppSecondarySidebar = ({ config }) => {
       </div>
 
       <div className="h-[calc(100vh-88px)] space-y-6 overflow-y-auto p-5">
-        <div className="relative">
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder={config.searchPlaceholder}
-            className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-indigo-500"
-          />
-        </div>
+        {config.searchEnabled !== false ? (
+          <div className="relative">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder={config.searchPlaceholder}
+              className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-indigo-500"
+            />
+          </div>
+        ) : null}
 
         {groups.map((group) => (
           <section key={group.title} className="space-y-2">
