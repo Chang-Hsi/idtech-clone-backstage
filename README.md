@@ -172,3 +172,126 @@ Start M1 implementation:
 1. Auth route skeleton
 2. Protected layout
 3. Dashboard + pages list placeholders
+
+## Vitest Plan (Backstage): Payload Normalizer Tests
+
+Goal: prevent frontend-backend contract mismatch before save APIs are called.
+
+### Scope for this phase
+
+- Add `Vitest` runner scripts for backstage unit tests.
+- Focus only on frontend payload normalization logic (pure functions).
+- Do not test UI rendering in this phase.
+
+### Why this matters
+
+- Backend validates request body strictly (`zod` on API side).
+- Frontend often has draft/form states with `null`, empty strings, mixed types.
+- A stable normalizer layer guarantees API payload shape before `request()`.
+
+### Test targets
+
+1. Settings employees payload normalizer
+
+- Normalize `id/email/displayName/avatarUrl` to trimmed strings.
+- Normalize `status` to `active|archived`.
+- Normalize `roleIds` to string array without empty items.
+- Convert `forcePasswordReset` to boolean.
+- Remove `lastLoginAt` when it is `null/empty`; keep only non-empty string.
+
+2. Careers payload normalizer/update payload builder
+
+- `normalizeCareersPayload`:
+  - ensure `tabs` includes `all` fallback
+  - normalize tab key to lowercase
+  - normalize job fields to trimmed strings
+  - convert legacy arrays (`jobDuties`, `qualifications`) to markdown list
+- `buildCareersUpdatePayload`:
+  - generate API write payload with trimmed markdown fields
+  - keep only backend-supported fields
+
+### File plan
+
+- `src/utils/payloadNormalizers.js` (new)
+  - shared pure normalizers for API writes
+- `src/components/pages/company/careers/careersFormUtils.js` (existing)
+  - keep as careers normalizer source
+- `test/utils/payloadNormalizers.test.js` (new)
+- `test/components/pages/company/careers/careersFormUtils.test.js` (new)
+
+### Definition of Done
+
+- `npm run test` passes in `idtech-clone-backstage`.
+- Critical normalizer rules above are covered by unit tests.
+- Settings employee save flow uses shared normalizer utility (not inline per-page duplicate logic).
+
+## Vitest Plan (Backstage): All Write API Contract Tests
+
+Goal: ensure every frontend write API helper sends the correct request contract.
+
+### Scope for this phase
+
+- Cover all `POST/PUT` helpers under `src/api/*`.
+- Assert request path, HTTP method, and serialized request body.
+- Validate helper-level payload shaping where helper intentionally selects fields.
+
+### Test strategy
+
+1. Single mocked request layer
+
+- Mock `request` from `src/lib/request`.
+- Treat each API helper as a contract function that maps input to transport payload.
+
+2. Contract assertions per helper
+
+- Correct endpoint path.
+- Correct HTTP method.
+- Correct JSON payload shape.
+- Important default behavior (example: reset-password with empty payload object).
+
+3. Risk-oriented focus
+
+- Include settings/auth/SEO plus all content and page write routes.
+- Catch regressions when endpoint path or payload keys change during refactors.
+
+### File plan
+
+- `test/api/*.writeApi.test.js`
+  - one test file per API module
+  - examples:
+    - `test/api/settings.writeApi.test.js`
+    - `test/api/seo.writeApi.test.js`
+    - `test/api/contentProducts.writeApi.test.js`
+
+### Definition of Done
+
+- All write helpers in `src/api` have at least one contract assertion.
+- `npm run test` passes locally.
+- Existing payload normalizer tests continue to pass.
+
+## Vitest + Shared Contract (Implemented POC)
+
+Goal: move high-risk write payload validation to a single contract source shared by backend and backstage.
+
+### Current implementation scope
+
+- Shared package: `@chang-hsi/idtech-shared-contracts` (GitHub Packages)
+- Shared schemas currently applied:
+  - `settingsEmployeeSchema`
+  - `settingsEmployeesWriteSchema`
+- Backstage integration:
+  - `src/utils/payloadNormalizers.js`
+  - `buildSettingsEmployeesWritePayload()` validates with shared zod schema before API call
+
+### Why this improves Vitest strategy
+
+- Payload normalizer tests now verify against the same schema used by backend.
+- Contract mismatch risk (`null`/type drift) is caught before request send.
+- Backend keeps route-level integration tests; backstage keeps transport/normalizer unit tests.
+
+### CI requirement for package install
+
+- `.npmrc` uses scoped registry:
+  - `@chang-hsi:registry=https://npm.pkg.github.com`
+- CI must provide auth token for GitHub Packages (read package):
+  - set `NODE_AUTH_TOKEN` (or run npm config for `//npm.pkg.github.com/:_authToken`)

@@ -38,6 +38,7 @@ import {
   updateBackstageSettingsSecurityPolicies,
 } from '../../../api/backstageSettingsApi'
 import { formatDateTime } from '../../../utils/formatters'
+import { buildSettingsEmployeesWritePayload } from '../../../utils/payloadNormalizers'
 
 const SETTINGS_ACTIONS = [
   { key: 'read', label: 'Read' },
@@ -179,26 +180,6 @@ const isValidHttpUrl = (value) => {
     return false
   }
 }
-
-const normalizeEmployeesForWrite = (employees) =>
-  (Array.isArray(employees) ? employees : []).map((employee) => {
-    const normalized = {
-      id: String(employee?.id ?? '').trim(),
-      email: String(employee?.email ?? '').trim(),
-      displayName: String(employee?.displayName ?? '').trim(),
-      avatarUrl: String(employee?.avatarUrl ?? '').trim(),
-      status: employee?.status === 'archived' ? 'archived' : 'active',
-      roleIds: Array.isArray(employee?.roleIds)
-        ? employee.roleIds.map((roleId) => String(roleId ?? '').trim()).filter(Boolean)
-        : [],
-      forcePasswordReset: Boolean(employee?.forcePasswordReset),
-    }
-    const lastLoginAt = employee?.lastLoginAt
-    if (typeof lastLoginAt === 'string' && lastLoginAt.trim()) {
-      normalized.lastLoginAt = lastLoginAt.trim()
-    }
-    return normalized
-  })
 
 const SettingsManagerPage = () => {
   const location = useLocation()
@@ -454,10 +435,11 @@ const SettingsManagerPage = () => {
     setSuccessMessage('')
     setIssuedCredentials([])
     try {
-      const response = await updateBackstageSettingsEmployees({
-        employees: normalizeEmployeesForWrite(nextEmployees),
+      const payload = buildSettingsEmployeesWritePayload({
+        employees: nextEmployees,
         updatedBy: editorId,
       })
+      const response = await updateBackstageSettingsEmployees(payload)
       const credentials = Array.isArray(response?.data?.issuedCredentials) ? response.data.issuedCredentials : []
       if (!isMountedRef.current) return
       setIssuedCredentials(credentials)

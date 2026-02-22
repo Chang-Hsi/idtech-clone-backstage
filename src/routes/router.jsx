@@ -26,6 +26,7 @@ import CompanyCareerEditPageManager from '../pages/contentTypes/CompanyCareerEdi
 import SeoPageManager from '../pages/seo/SeoPageManager'
 import SettingsPageManager from '../pages/settings/SettingsPageManager'
 import PlaceholderPage from '../pages/PlaceholderPage'
+import DashboardPageManager from '../pages/DashboardPageManager'
 import RequireAuth from './guards/RequireAuth'
 import RequireGuest from './guards/RequireGuest'
 
@@ -35,6 +36,7 @@ const pageRoutes = [
     title: 'Dashboard',
     description: 'Overview of content operations, publish activity, and editing status.',
     primaryNav: 'dashboard',
+    element: <DashboardPageManager />,
   },
   {
     path: 'pages/home',

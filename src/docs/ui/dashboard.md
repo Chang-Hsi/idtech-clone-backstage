@@ -148,3 +148,65 @@ MVP 先支援兩階段：
 3. 完成版面與 responsive
 4. 接入 router（確認 `/dashboard` 為登入後主入口）
 5. 補 `NotFoundPage` 並改 wildcard route
+
+## 10. Testing Health 儀表板（Vitest Coverage）
+
+為了讓 Dashboard 更貼近工程品質監控，本期新增「Testing Health」區塊（Recharts）。
+
+### 10.1 顯示目標
+
+1. Backend Coverage %
+2. Backstage Coverage %
+3. 最近一次測試通過率（Pass Rate）
+4. 趨勢（up/down/flat）
+
+### 10.2 UI 呈現策略
+
+1. KPI Cards：三張核心指標卡，含百分比與趨勢箭頭
+2. Recharts LineChart：同圖呈現三條趨勢線
+   - Backend Coverage
+   - Backstage Coverage
+   - Pass Rate
+3. 無資料狀態：顯示「尚未從 CI 匯入 metrics」提示
+
+### 10.3 API 與資料流
+
+Dashboard 僅讀取 API，不直接執行測試：
+
+1. CI 跑 Vitest coverage，整理數值後上報後端
+2. 後端儲存歷史快照
+3. 後台 Dashboard 呼叫 `GET /api/backstage/dashboard/testing-health` 顯示
+
+### 10.4 後端端點規劃
+
+讀取（給後台）：
+
+1. `GET /api/backstage/dashboard/testing-health`
+
+CI 上報（給 pipeline）：
+
+1. `PUT /api/internal/dashboard/testing-health`
+2. 驗證：`Authorization: Bearer <DASHBOARD_METRICS_INGEST_TOKEN>` 或 `X-Metrics-Token`
+
+### 10.5 payload（CI -> API）建議格式
+
+```json
+{
+  "source": "github-actions",
+  "branch": "main",
+  "commitSha": "abc1234",
+  "runId": "1234567890",
+  "runUrl": "https://github.com/...",
+  "recordedAt": "2026-02-22T10:00:00.000Z",
+  "backend": { "lines": 88.5, "functions": 86.2, "branches": 72.4, "statements": 88.1 },
+  "backstage": { "lines": 82.3, "functions": 80.1, "branches": 69.8, "statements": 82.0 },
+  "passRate": 100
+}
+```
+
+### 10.6 驗收標準（Testing Health）
+
+1. `/dashboard` 可顯示 3 張 KPI 卡與趨勢圖
+2. API 有資料時可正確渲染；無資料時不破版
+3. Trend 會依最近一次與前一次快照比較顯示 up/down/flat
+4. Backend / Backstage Vitest 皆可通過

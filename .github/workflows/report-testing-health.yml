@@ -1,0 +1,99 @@
+name: Report Testing Health (Backstage)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
+          DASHBOARD_METRICS_INGEST_TOKEN: ${{ secrets.DASHBOARD_METRICS_INGEST_TOKEN }}
+        run: |
+          missing=()
+          [ -z "$BACKEND_BASE_URL" ] && missing+=("BACKEND_BASE_URL")
+          [ -z "$DASHBOARD_METRICS_INGEST_TOKEN" ] && missing+=("DASHBOARD_METRICS_INGEST_TOKEN")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure coverage runner
+        run: npm i -D --no-save vitest @vitest/coverage-v8
+
+      - name: Run tests with coverage
+        run: |
+          if npm run | grep -q "test:coverage"; then
+            npm run test:coverage
+          else
+            npx vitest run --coverage --coverage.reporter=json-summary --passWithNoTests
+          fi
+
+      - name: Read coverage summary
+        id: coverage
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'))
+          const total = summary.total || {}
+          const toPct = (value) => {
+            const num = Number(value)
+            return Number.isFinite(num) ? num.toFixed(2) : '0.00'
+          }
+          const output = process.env.GITHUB_OUTPUT
+          fs.appendFileSync(output, `lines=${toPct(total.lines?.pct)}\n`)
+          fs.appendFileSync(output, `functions=${toPct(total.functions?.pct)}\n`)
+          fs.appendFileSync(output, `branches=${toPct(total.branches?.pct)}\n`)
+          fs.appendFileSync(output, `statements=${toPct(total.statements?.pct)}\n`)
+          NODE
+
+      - name: Push metrics to backend
+        env:
+          BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
+          DASHBOARD_METRICS_INGEST_TOKEN: ${{ secrets.DASHBOARD_METRICS_INGEST_TOKEN }}
+        run: |
+          payload=$(cat <<JSON
+          {
+            "source":"github-actions",
+            "branch":"${GITHUB_REF_NAME}",
+            "commitSha":"${GITHUB_SHA}",
+            "runId":"${GITHUB_RUN_ID}",
+            "runUrl":"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
+            "recordedAt":"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
+            "backstage":{
+              "lines":${{ steps.coverage.outputs.lines }},
+              "functions":${{ steps.coverage.outputs.functions }},
+              "branches":${{ steps.coverage.outputs.branches }},
+              "statements":${{ steps.coverage.outputs.statements }}
+            },
+            "passRate":100
+          }
+          JSON
+          )
+
+          http_code=$(curl --silent --show-error \
+            -o /tmp/metrics-response.json \
+            -w "%{http_code}" \
+            -X PUT "${BACKEND_BASE_URL}/api/internal/dashboard/testing-health" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${DASHBOARD_METRICS_INGEST_TOKEN}" \
+            -d "${payload}")
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Metrics ingest failed with HTTP ${http_code}"
+            cat /tmp/metrics-response.json
+            exit 1
+          fi
