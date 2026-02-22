@@ -25,6 +25,8 @@ const SettingsEmployeesSection = ({
   pagedEmployees,
   employeeOffset,
   employeeRoleMap,
+  employeeRegionOptions,
+  employeeCareerOptions,
   formatDateTime,
   openEditEmployeeDialog,
   requestResetEmployeePassword,
@@ -98,13 +100,15 @@ const SettingsEmployeesSection = ({
 
       <div className="rounded-lg border border-slate-200">
         <div className="overflow-x-auto">
-          <table className="min-w-[980px] table-auto border-collapse text-left text-sm text-slate-700">
+          <table className="min-w-[1240px] table-auto border-collapse text-left text-sm text-slate-700">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="w-[64px] px-4 py-3">ID</th>
-                <th className="w-[180px] px-4 py-3">Name</th>
-                <th className="w-[220px] px-4 py-3">Email</th>
+                <th className="w-[220px] px-4 py-3">Name</th>
+                <th className="w-[180px] px-4 py-3">Email</th>
                 <th className="w-[220px] px-4 py-3">Employee ID</th>
+                <th className="w-[140px] px-4 py-3">Region</th>
+                <th className="w-[220px] px-4 py-3">Career</th>
                 <th className="w-[180px] px-4 py-3">Role</th>
                 <th className="w-[140px] px-4 py-3">Status</th>
                 <th className="w-[180px] px-4 py-3">Last Login</th>
@@ -114,7 +118,7 @@ const SettingsEmployeesSection = ({
             <tbody>
               {pagedEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                     No employees found.
                   </td>
                 </tr>
@@ -122,6 +126,9 @@ const SettingsEmployeesSection = ({
                 pagedEmployees.map((employee, index) => {
                   const primaryRoleId = employee.roleIds?.[0] ?? ''
                   const primaryRole = employeeRoleMap.get(primaryRoleId)
+                  const regionOption = employeeRegionOptions.find(
+                    (option) => option.value === String(employee.regionCode ?? '').trim().toLowerCase(),
+                  )
                   return (
                     <tr key={employee.id} className="border-t border-slate-200">
                       <td className="px-4 py-3 align-middle text-slate-500">{employeeOffset + index + 1}</td>
@@ -133,8 +140,14 @@ const SettingsEmployeesSection = ({
                           </span>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 align-middle text-slate-600">{employee.email || '-'}</td>
+                      <td className="w-[220px] px-4 py-3 align-middle text-slate-600">
+                        <span className="block max-w-[180px] truncate" title={employee.email || '-'}>
+                          {employee.email || '-'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 align-middle text-slate-600">{employee.id}</td>
+                      <td className="px-4 py-3 align-middle text-slate-600">{regionOption?.label ?? '-'}</td>
+                      <td className="px-4 py-3 align-middle text-slate-600">{employee.careerTitle || '-'}</td>
                       <td className="px-4 py-3 align-middle text-slate-600">{primaryRole?.name ?? '-'}</td>
                       <td className="px-4 py-3 align-middle">
                         <span
@@ -272,6 +285,34 @@ const SettingsEmployeesSection = ({
                     }
                   }}
                   placeholder="Select role"
+                />
+              </FormField>
+              <FormField label="Region" required error={employeeDialogErrors.regionCode}>
+                <DropdownSelect
+                  value={employeeDialog.regionCode}
+                  options={employeeRegionOptions}
+                  onChange={(nextValue) => {
+                    const nextRegionCode = String(nextValue ?? '').trim().toLowerCase()
+                    setEmployeeDialog((prev) => ({ ...prev, regionCode: nextRegionCode, careerTitle: '' }))
+                    if (employeeDialogErrors.regionCode || employeeDialogErrors.careerTitle) {
+                      setEmployeeDialogErrors((prev) => ({ ...prev, regionCode: '', careerTitle: '' }))
+                    }
+                  }}
+                  placeholder="Select region"
+                />
+              </FormField>
+              <FormField label="Career" required error={employeeDialogErrors.careerTitle}>
+                <DropdownSelect
+                  value={employeeDialog.careerTitle}
+                  options={employeeCareerOptions}
+                  onChange={(nextValue) => {
+                    setEmployeeDialog((prev) => ({ ...prev, careerTitle: nextValue || '' }))
+                    if (employeeDialogErrors.careerTitle) {
+                      setEmployeeDialogErrors((prev) => ({ ...prev, careerTitle: '' }))
+                    }
+                  }}
+                  placeholder={employeeDialog.regionCode ? 'Select career' : 'Select region first'}
+                  disabled={!employeeDialog.regionCode}
                 />
               </FormField>
               <FormField label="Status" required>

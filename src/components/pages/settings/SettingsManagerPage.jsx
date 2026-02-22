@@ -21,6 +21,7 @@ import {
   updateBackstageSettingsRoles,
   updateBackstageSettingsSecurityPolicies,
 } from '../../../api/backstageSettingsApi'
+import { fetchBackstageCompanyCareers } from '../../../api/backstageCompanyCareersApi'
 import { formatDateTime } from '../../../utils/formatters'
 import { buildSettingsEmployeesWritePayload } from '../../../utils/payloadNormalizers'
 
@@ -138,6 +139,8 @@ const SECURITY_BOOLEAN_FIELDS = [
   { key: 'requireNumber', label: 'Require numeric characters' },
   { key: 'requireSymbol', label: 'Require special characters' },
 ]
+const DEFAULT_EMPLOYEE_REGION_CODE = 'tw'
+const DEFAULT_EMPLOYEE_CAREER_TITLE = 'Senior SRE Engineer'
 
 const getActiveSection = (pathname) => {
   const matched = Object.keys(ACTIVE_SECTIONS).find((route) => pathname.startsWith(route))
@@ -222,11 +225,15 @@ const SettingsManagerPage = () => {
     email: '',
     roleId: '',
     status: 'active',
+    regionCode: DEFAULT_EMPLOYEE_REGION_CODE,
+    careerTitle: DEFAULT_EMPLOYEE_CAREER_TITLE,
   })
   const [employeeDialogErrors, setEmployeeDialogErrors] = useState({
     displayName: '',
     email: '',
     roleId: '',
+    regionCode: '',
+    careerTitle: '',
   })
   const [employeeActionTarget, setEmployeeActionTarget] = useState(null)
   const [employeeActionRemind, setEmployeeActionRemind] = useState({
@@ -314,10 +321,55 @@ const SettingsManagerPage = () => {
     }
 
     try {
-      const payload = await fetchBackstageSettings()
+      const [payload, careersPayload] = await Promise.all([
+        fetchBackstageSettings(),
+        fetchBackstageCompanyCareers(),
+      ])
       if (!isMountedRef.current) return
       const responseSettings = payload?.data?.settings ?? emptySettings
-      setSettings({ ...emptySettings, ...responseSettings, auditLogs: [] })
+      const careersPage = careersPayload?.data?.careersPage ?? {}
+      const careersTabs = Array.isArray(careersPage?.tabs) ? careersPage.tabs : []
+      const careersJobs = Array.isArray(careersPage?.jobs) ? careersPage.jobs : []
+      const normalizedRegionCodeSet = new Set(
+        careersTabs
+          .map((tab) => String(tab?.key ?? '').trim().toLowerCase())
+          .filter((key) => key && key !== 'all'),
+      )
+      const regionFallback = normalizedRegionCodeSet.has(DEFAULT_EMPLOYEE_REGION_CODE)
+        ? DEFAULT_EMPLOYEE_REGION_CODE
+        : (Array.from(normalizedRegionCodeSet)[0] ?? DEFAULT_EMPLOYEE_REGION_CODE)
+      const careersByRegion = careersJobs.reduce((acc, job) => {
+        const code = String(job?.countryCode ?? '').trim().toLowerCase()
+        const title = String(job?.title ?? '').trim()
+        if (!code || !title) return acc
+        if (!acc[code]) acc[code] = new Set()
+        acc[code].add(title)
+        return acc
+      }, {})
+      const employeeDefaults = (Array.isArray(responseSettings?.employees) ? responseSettings.employees : []).map((employee) => {
+        const normalizedRegionCode = String(employee?.regionCode ?? '').trim().toLowerCase()
+        const regionCode = normalizedRegionCodeSet.has(normalizedRegionCode) ? normalizedRegionCode : regionFallback
+        const regionCareerSet = careersByRegion[regionCode] ?? new Set()
+        const preferredCareer = String(employee?.careerTitle ?? '').trim()
+        const fallbackCareer = regionCareerSet.has(DEFAULT_EMPLOYEE_CAREER_TITLE)
+          ? DEFAULT_EMPLOYEE_CAREER_TITLE
+          : (Array.from(regionCareerSet)[0] ?? DEFAULT_EMPLOYEE_CAREER_TITLE)
+        return {
+          ...employee,
+          regionCode,
+          careerTitle: regionCareerSet.has(preferredCareer) ? preferredCareer : fallbackCareer,
+        }
+      })
+      setSettings({
+        ...emptySettings,
+        ...responseSettings,
+        employees: employeeDefaults,
+        careersPage: {
+          tabs: careersTabs,
+          jobs: careersJobs,
+        },
+        auditLogs: [],
+      })
       setSavedSecurityPolicies({
         ...emptySettings.securityPolicies,
         ...(responseSettings?.securityPolicies ?? {}),
@@ -565,6 +617,33 @@ const SettingsManagerPage = () => {
     () => new Map(settings.roles.map((role) => [role.id, role])),
     [settings.roles],
   )
+  const careersPage = settings?.careersPage
+  const employeeRegionOptions = useMemo(() => {
+    const tabs = Array.isArray(careersPage?.tabs) ? careersPage.tabs : []
+    return tabs
+      .filter((tab) => String(tab?.key ?? '').trim().toLowerCase() !== 'all')
+      .map((tab) => ({
+        value: String(tab?.key ?? '').trim().toLowerCase(),
+        label: String(tab?.label ?? '').trim() || String(tab?.key ?? '').trim().toUpperCase(),
+      }))
+      .filter((option) => option.value)
+  }, [careersPage])
+  const employeeCareerOptionsByRegion = useMemo(() => {
+    const jobs = Array.isArray(careersPage?.jobs) ? careersPage.jobs : []
+    return jobs.reduce((acc, job) => {
+      const regionCode = String(job?.countryCode ?? '').trim().toLowerCase()
+      const title = String(job?.title ?? '').trim()
+      if (!regionCode || !title) return acc
+      if (!acc[regionCode]) acc[regionCode] = new Set()
+      acc[regionCode].add(title)
+      return acc
+    }, {})
+  }, [careersPage])
+  const selectedRegionCode = String(employeeDialog.regionCode ?? '').trim().toLowerCase()
+  const employeeCareerOptions = useMemo(() => {
+    const careerSet = employeeCareerOptionsByRegion[selectedRegionCode] ?? new Set()
+    return Array.from(careerSet).map((title) => ({ value: title, label: title }))
+  }, [employeeCareerOptionsByRegion, selectedRegionCode])
   const filteredEmployees = useMemo(() => {
     const keyword = employeeQuery.trim().toLowerCase()
     return (settings.employees ?? [])
@@ -572,7 +651,7 @@ const SettingsManagerPage = () => {
         if (employeeStatusFilter !== 'all' && employee.status !== employeeStatusFilter) return false
         if (employeeRoleFilter !== 'all' && !employee.roleIds.includes(employeeRoleFilter)) return false
         if (!keyword) return true
-        const haystack = `${employee.displayName} ${employee.email} ${employee.id}`.toLowerCase()
+        const haystack = `${employee.displayName} ${employee.email} ${employee.id} ${employee.regionCode ?? ''} ${employee.careerTitle ?? ''}`.toLowerCase()
         return haystack.includes(keyword)
       })
       .sort((a, b) => {
@@ -618,7 +697,14 @@ const SettingsManagerPage = () => {
   }
 
   const openCreateEmployeeDialog = () => {
-    setEmployeeDialogErrors({ displayName: '', email: '', roleId: '' })
+    const defaultRegionCode = employeeRegionOptions.find((item) => item.value === DEFAULT_EMPLOYEE_REGION_CODE)?.value
+      ?? employeeRegionOptions[0]?.value
+      ?? DEFAULT_EMPLOYEE_REGION_CODE
+    const defaultCareerSet = employeeCareerOptionsByRegion[defaultRegionCode] ?? new Set()
+    const defaultCareerTitle = defaultCareerSet.has(DEFAULT_EMPLOYEE_CAREER_TITLE)
+      ? DEFAULT_EMPLOYEE_CAREER_TITLE
+      : (Array.from(defaultCareerSet)[0] ?? DEFAULT_EMPLOYEE_CAREER_TITLE)
+    setEmployeeDialogErrors({ displayName: '', email: '', roleId: '', regionCode: '', careerTitle: '' })
     setEmployeeDialog({
       isOpen: true,
       mode: 'create',
@@ -627,11 +713,26 @@ const SettingsManagerPage = () => {
       email: '',
       roleId: activeRoleOptions[0]?.value ?? '',
       status: 'active',
+      regionCode: defaultRegionCode,
+      careerTitle: defaultCareerTitle,
     })
   }
 
   const openEditEmployeeDialog = (employee) => {
-    setEmployeeDialogErrors({ displayName: '', email: '', roleId: '' })
+    const regionFromEmployee = String(employee?.regionCode ?? '').trim().toLowerCase()
+    const safeRegionCode = employeeRegionOptions.some((option) => option.value === regionFromEmployee)
+      ? regionFromEmployee
+      : (employeeRegionOptions.find((item) => item.value === DEFAULT_EMPLOYEE_REGION_CODE)?.value
+        ?? employeeRegionOptions[0]?.value
+        ?? DEFAULT_EMPLOYEE_REGION_CODE)
+    const editCareerSet = employeeCareerOptionsByRegion[safeRegionCode] ?? new Set()
+    const employeeCareerTitle = String(employee?.careerTitle ?? '').trim()
+    const safeCareerTitle = editCareerSet.has(employeeCareerTitle)
+      ? employeeCareerTitle
+      : (editCareerSet.has(DEFAULT_EMPLOYEE_CAREER_TITLE)
+        ? DEFAULT_EMPLOYEE_CAREER_TITLE
+        : (Array.from(editCareerSet)[0] ?? DEFAULT_EMPLOYEE_CAREER_TITLE))
+    setEmployeeDialogErrors({ displayName: '', email: '', roleId: '', regionCode: '', careerTitle: '' })
     setEmployeeDialog({
       isOpen: true,
       mode: 'edit',
@@ -640,11 +741,13 @@ const SettingsManagerPage = () => {
       email: employee.email ?? '',
       roleId: employee.roleIds?.[0] ?? '',
       status: employee.status === 'archived' ? 'archived' : 'active',
+      regionCode: safeRegionCode,
+      careerTitle: safeCareerTitle,
     })
   }
 
   const closeEmployeeDialog = () => {
-    setEmployeeDialogErrors({ displayName: '', email: '', roleId: '' })
+    setEmployeeDialogErrors({ displayName: '', email: '', roleId: '', regionCode: '', careerTitle: '' })
     setEmployeeDialog((prev) => ({ ...prev, isOpen: false }))
   }
 
@@ -652,11 +755,23 @@ const SettingsManagerPage = () => {
     const displayName = String(employeeDialog.displayName ?? '').trim()
     const email = String(employeeDialog.email ?? '').trim()
     const roleId = String(employeeDialog.roleId ?? '').trim()
+    const regionCode = String(employeeDialog.regionCode ?? '').trim().toLowerCase()
+    const careerTitle = String(employeeDialog.careerTitle ?? '').trim()
+    const careerSet = employeeCareerOptionsByRegion[regionCode] ?? new Set()
 
     const nextErrors = {
       displayName: displayName ? '' : 'Display name is required.',
       email: '',
       roleId: roleId ? '' : 'Role is required.',
+      regionCode: regionCode ? '' : 'Region is required.',
+      careerTitle: '',
+    }
+    if (!regionCode) {
+      nextErrors.careerTitle = 'Select region first.'
+    } else if (!careerTitle) {
+      nextErrors.careerTitle = 'Career is required.'
+    } else if (!careerSet.has(careerTitle)) {
+      nextErrors.careerTitle = 'Selected career is not available in this region.'
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!email) {
@@ -673,7 +788,7 @@ const SettingsManagerPage = () => {
     }
 
     setEmployeeDialogErrors(nextErrors)
-    return !nextErrors.displayName && !nextErrors.email && !nextErrors.roleId
+    return !nextErrors.displayName && !nextErrors.email && !nextErrors.roleId && !nextErrors.regionCode && !nextErrors.careerTitle
   }
 
   const saveEmployeeDialog = async () => {
@@ -686,6 +801,8 @@ const SettingsManagerPage = () => {
       avatarUrl: '',
       status: employeeDialog.status === 'archived' ? 'archived' : 'active',
       roleIds: employeeDialog.roleId ? [employeeDialog.roleId] : [],
+      regionCode: String(employeeDialog.regionCode ?? '').trim().toLowerCase(),
+      careerTitle: String(employeeDialog.careerTitle ?? '').trim(),
       lastLoginAt: null,
       forcePasswordReset: employeeDialog.mode === 'create',
     }
@@ -700,6 +817,8 @@ const SettingsManagerPage = () => {
                   email: nextEmployee.email,
                   status: nextEmployee.status,
                   roleIds: nextEmployee.roleIds,
+                  regionCode: nextEmployee.regionCode,
+                  careerTitle: nextEmployee.careerTitle,
                 }
               : employee,
           )
@@ -837,6 +956,8 @@ const SettingsManagerPage = () => {
           pagedEmployees={pagedEmployees}
           employeeOffset={employeeOffset}
           employeeRoleMap={employeeRoleMap}
+          employeeRegionOptions={employeeRegionOptions}
+          employeeCareerOptions={employeeCareerOptions}
           formatDateTime={formatDateTime}
           openEditEmployeeDialog={openEditEmployeeDialog}
           requestResetEmployeePassword={requestResetEmployeePassword}

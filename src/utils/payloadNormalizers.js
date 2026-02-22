@@ -7,6 +7,8 @@ const settingsEmployeeSchema = z.object({
   avatarUrl: z.url().trim().optional().or(z.literal('')).default(''),
   status: z.enum(['active', 'archived']).default('active'),
   roleIds: z.array(z.string().trim().min(1)).default([]),
+  regionCode: z.string().trim().min(1),
+  careerTitle: z.string().trim().min(1),
   lastLoginAt: z.string().trim().optional(),
   forcePasswordReset: z.boolean().optional().default(false),
 })
@@ -27,6 +29,8 @@ export const normalizeEmployeesForWrite = (employees) =>
       roleIds: Array.isArray(employee?.roleIds)
         ? employee.roleIds.map((roleId) => String(roleId ?? '').trim()).filter(Boolean)
         : [],
+      regionCode: String(employee?.regionCode ?? '').trim().toLowerCase(),
+      careerTitle: String(employee?.careerTitle ?? '').trim(),
       forcePasswordReset: Boolean(employee?.forcePasswordReset),
     }
 
