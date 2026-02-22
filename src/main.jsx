@@ -17,7 +17,10 @@ const restoreGithubPagesRedirect = () => {
   const normalizedBase = import.meta.env.BASE_URL.endsWith('/')
     ? import.meta.env.BASE_URL.slice(0, -1)
     : import.meta.env.BASE_URL
-  const normalizedRedirect = redirect.startsWith('/') ? redirect : `/${redirect}`
+  let normalizedRedirect = redirect.startsWith('/') ? redirect : `/${redirect}`
+  if (normalizedBase && (normalizedRedirect === normalizedBase || normalizedRedirect.startsWith(`${normalizedBase}/`))) {
+    normalizedRedirect = normalizedRedirect.slice(normalizedBase.length) || '/'
+  }
   const targetUrl = `${normalizedBase}${normalizedRedirect}`
   const finalUrl = remainingSearch ? `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}${remainingSearch}` : targetUrl
 

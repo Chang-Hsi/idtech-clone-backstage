@@ -9,11 +9,12 @@
     <script>
       ;(() => {
         const repoBase = '/idtech-clone-backstage'
-        const isRepoPath = window.location.pathname.startsWith(`${repoBase}/`)
+        const currentPath = window.location.pathname
+        const isRepoPath = currentPath === repoBase || currentPath.startsWith(`${repoBase}/`)
         const basePath = isRepoPath ? repoBase : ''
         const relativePath = isRepoPath
-          ? window.location.pathname.slice(repoBase.length)
-          : window.location.pathname
+          ? currentPath.slice(repoBase.length) || '/'
+          : currentPath || '/'
         const redirectValue = `${relativePath}${window.location.search}${window.location.hash}`
         const nextUrl = `${basePath}/?__redirect=${encodeURIComponent(redirectValue)}`
 

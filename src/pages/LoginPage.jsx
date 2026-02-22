@@ -15,7 +15,7 @@ const LoginPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  const redirectTo = location.state?.from ?? '/pages/home'
+  const redirectTo = location.state?.from ?? '/dashboard'
   const reasonMessage =
     location.state?.reason === 'password-updated'
       ? 'Password updated. Please sign in again.'

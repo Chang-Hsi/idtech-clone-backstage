@@ -40,6 +40,7 @@ const DashboardPageManager = () => {
   return (
     <section className="space-y-4">
       <DashboardHeader
+        userDisplayName={userProfile?.displayName ?? user?.displayName ?? ''}
         updatedAt={updatedAt}
         onRefresh={() => refreshDashboard()}
         isRefreshing={status === 'loading'}

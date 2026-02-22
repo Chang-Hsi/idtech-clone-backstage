@@ -300,7 +300,7 @@ const router = createBrowserRouter(
         </RequireAuth>
       ),
       children: [
-        { index: true, element: <Navigate to="/pages/home" replace /> },
+        { index: true, element: <Navigate to="/dashboard" replace /> },
         ...pageRoutes.map((route) => ({
           path: route.path,
           element: route.element ?? <PlaceholderPage title={route.title} description={route.description} />,
@@ -311,7 +311,7 @@ const router = createBrowserRouter(
         })),
       ],
     },
-    { path: '*', element: <Navigate to="/pages/home" replace /> },
+    { path: '*', element: <Navigate to="/dashboard" replace /> },
   ],
   {
     basename: import.meta.env.BASE_URL,

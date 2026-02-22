@@ -9,7 +9,7 @@ const RequireGuest = ({ children }) => {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/pages/home" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   return children
