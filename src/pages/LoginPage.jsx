@@ -9,7 +9,7 @@ const LoginPage = () => {
   const { login } = useAuth()
   const [formData, setFormData] = useState({
     email: 'admin@idtech.local',
-    password: 'Watasywa8531',
+    password: 'Admin1234!',
   })
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
