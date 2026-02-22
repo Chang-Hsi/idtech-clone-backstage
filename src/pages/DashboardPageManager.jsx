@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowPathIcon } from '@heroicons/react/24/outline'
 import {
   CartesianGrid,
   Legend,
@@ -9,7 +10,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { fetchBackstageDashboardTestingHealth } from '../api/backstageDashboardApi'
+import {
+  fetchBackstageDashboardTestingHealth,
+  triggerBackstageDashboardTestingHealthRefresh,
+} from '../api/backstageDashboardApi'
 import StatusMessage from '../components/common/StatusMessage'
 import { formatDateTime } from '../utils/formatters'
 
@@ -50,27 +54,63 @@ const TestingKpiCard = ({ title, value, trend }) => {
 const DashboardPageManager = () => {
   const [status, setStatus] = useState('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [testingHealth, setTestingHealth] = useState(null)
+  const [triggerInfo, setTriggerInfo] = useState(null)
+  const [isTriggering, setIsTriggering] = useState(false)
   const [updatedAt, setUpdatedAt] = useState(null)
 
-  useEffect(() => {
-    const load = async () => {
-      setStatus('loading')
-      setErrorMessage('')
-      try {
-        const response = await fetchBackstageDashboardTestingHealth()
-        if (response.code !== 0) throw new Error(response.message || 'Failed to load dashboard data.')
-        setTestingHealth(response.testingHealth ?? null)
-        setUpdatedAt(response.updatedAt ?? null)
-        setStatus('success')
-      } catch (error) {
-        setErrorMessage(error?.message || 'Unable to load dashboard data.')
-        setStatus('error')
-      }
+  const loadDashboard = useCallback(async ({ preserveStatus = false } = {}) => {
+    if (!preserveStatus) setStatus('loading')
+    setErrorMessage('')
+    try {
+      const response = await fetchBackstageDashboardTestingHealth()
+      if (response.code !== 0) throw new Error(response.message || 'Failed to load dashboard data.')
+      setTestingHealth(response.testingHealth ?? null)
+      setTriggerInfo(response.trigger ?? null)
+      setUpdatedAt(response.updatedAt ?? null)
+      setStatus('success')
+    } catch (error) {
+      setErrorMessage(error?.message || 'Unable to load dashboard data.')
+      setStatus('error')
     }
-
-    load()
   }, [])
+
+  useEffect(() => {
+    loadDashboard()
+  }, [loadDashboard])
+
+  useEffect(() => {
+    const remaining = Number(triggerInfo?.cooldownRemainingSeconds ?? 0)
+    if (remaining <= 0) return undefined
+    const timer = window.setInterval(() => {
+      setTriggerInfo((prev) => {
+        const value = Number(prev?.cooldownRemainingSeconds ?? 0)
+        if (value <= 1) return { ...(prev ?? {}), cooldownRemainingSeconds: 0 }
+        return { ...(prev ?? {}), cooldownRemainingSeconds: value - 1 }
+      })
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [triggerInfo?.cooldownRemainingSeconds])
+
+  const handleTriggerRefresh = async () => {
+    if (isTriggering) return
+    if (Number(triggerInfo?.cooldownRemainingSeconds ?? 0) > 0) return
+    setIsTriggering(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const response = await triggerBackstageDashboardTestingHealthRefresh()
+      if (response.code !== 0) throw new Error(response.message || 'Unable to trigger testing refresh.')
+      setTriggerInfo(response.trigger ?? null)
+      setSuccessMessage('Testing health refresh queued. Coverage will update after CI completes.')
+      await loadDashboard({ preserveStatus: true })
+    } catch (error) {
+      setErrorMessage(error?.message || 'Unable to trigger testing refresh.')
+    } finally {
+      setIsTriggering(false)
+    }
+  }
 
   const summary = testingHealth?.summary ?? null
   const history = useMemo(() => {
@@ -80,6 +120,14 @@ const DashboardPageManager = () => {
       label: toShortTime(item.recordedAt),
     }))
   }, [testingHealth?.history])
+
+  const cooldownRemainingSeconds = Number(triggerInfo?.cooldownRemainingSeconds ?? 0)
+  const isCooldownActive = cooldownRemainingSeconds > 0
+  const triggerButtonLabel = isTriggering
+    ? 'Triggering...'
+    : isCooldownActive
+      ? `Retry in ${cooldownRemainingSeconds}s`
+      : 'Run CI refresh'
 
   return (
     <section className="space-y-4">
@@ -91,14 +139,37 @@ const DashboardPageManager = () => {
               Testing health overview powered by CI coverage snapshots.
             </p>
           </div>
-          <div className="text-right text-xs text-slate-500">
-            <p>Last refresh</p>
-            <p className="mt-1 font-medium text-slate-700">{formatDateTime(updatedAt)}</p>
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              onClick={handleTriggerRefresh}
+              disabled={isTriggering || isCooldownActive}
+              title="Trigger backend/backstage coverage workflows and refresh Dashboard data."
+              className={`group relative inline-flex h-9 w-9 items-center justify-center rounded-md border text-slate-700 transition ${
+                isTriggering || isCooldownActive
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                  : 'border-slate-300 bg-white hover:bg-slate-50'
+              }`}
+              aria-label={triggerButtonLabel}
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${isTriggering ? 'animate-spin' : ''}`} />
+              <span className="pointer-events-none absolute -top-11 left-1/2 w-60 -translate-x-1/2 rounded bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition group-hover:opacity-100">
+                {triggerButtonLabel}
+              </span>
+            </button>
+            <div className="text-right text-xs text-slate-500">
+              <p>Last refresh</p>
+              <p className="mt-1 font-medium text-slate-700">{formatDateTime(updatedAt)}</p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Last trigger: {formatDateTime(triggerInfo?.lastTriggeredAt)}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       <StatusMessage tone="error" message={errorMessage} />
+      <StatusMessage tone="success" message={successMessage} />
 
       {status === 'loading' ? (
         <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
