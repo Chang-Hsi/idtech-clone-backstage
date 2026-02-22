@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDownIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import ConfirmDialog from '../../dialog/ConfirmDialog'
 import RemindDialog from '../../dialog/RemindDialog'
 import FormField from '../../common/FormField'

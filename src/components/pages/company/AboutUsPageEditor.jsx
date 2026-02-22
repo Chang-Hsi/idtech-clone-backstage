@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useEffect, useMemo, useState } from 'react'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import DropdownSelect from '../../common/DropdownSelect'
 import FormField from '../../common/FormField'
 import StatusMessage from '../../common/StatusMessage'

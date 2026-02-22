@@ -4,7 +4,7 @@ import AppPrimarySidebar from '../components/layouts/AppPrimarySidebar'
 import AppSecondarySidebar from '../components/layouts/AppSecondarySidebar'
 import AppSeoSidebar from '../components/layouts/AppSeoSidebar'
 import { PRIMARY_NAV_ITEMS, SECONDARY_NAV_CONFIG } from '../components/layouts/layoutNavigation'
-import { useAuth } from '../features/auth/AuthProvider'
+import { useAuth } from '../features/auth/AuthContext'
 
 const AppLayout = () => {
   const { user, logout } = useAuth()

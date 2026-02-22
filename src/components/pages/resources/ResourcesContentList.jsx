@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Pagination from '../../common/Pagination'
 import StatusMessage from '../../common/StatusMessage'
 import ConfirmDialog from '../../dialog/ConfirmDialog'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import {
   archiveBackstageResource,
   fetchBackstageResources,

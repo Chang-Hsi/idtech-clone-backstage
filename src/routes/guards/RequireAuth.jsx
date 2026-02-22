@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../features/auth/AuthProvider'
+import { useAuth } from '../../features/auth/AuthContext'
 
 const RequireAuth = ({ children }) => {
   const { isAuthenticated, isInitializing, mustResetPassword } = useAuth()

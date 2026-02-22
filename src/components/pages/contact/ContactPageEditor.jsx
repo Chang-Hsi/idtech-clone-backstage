@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import FormField from '../../common/FormField'
 import DropdownSelect from '../../common/DropdownSelect'
 import StatusMessage from '../../common/StatusMessage'

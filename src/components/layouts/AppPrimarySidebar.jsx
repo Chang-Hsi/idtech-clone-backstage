@@ -15,7 +15,10 @@ const getInitials = (name = '') => {
 const AppPrimarySidebar = ({ items, activeKey, user, onLogout }) => {
   const navigate = useNavigate()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState('')
   const menuRef = useRef(null)
+  const avatarUrl = String(user?.avatarUrl ?? '').trim()
+  const shouldShowAvatarImage = Boolean(avatarUrl) && avatarUrl !== failedAvatarUrl
 
   useEffect(() => {
     if (!isMenuOpen) return
@@ -119,13 +122,24 @@ const AppPrimarySidebar = ({ items, activeKey, user, onLogout }) => {
           <button
             type="button"
             onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white"
+            className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ${
+              shouldShowAvatarImage ? 'bg-white ring-1 ring-slate-200' : 'bg-indigo-600 text-white'
+            }`}
             aria-label="Account"
             aria-haspopup="menu"
             aria-expanded={isMenuOpen}
             title={user?.displayName ?? user?.name ?? 'Account'}
           >
-            {getInitials(user?.displayName ?? user?.name)}
+            {shouldShowAvatarImage ? (
+              <img
+                src={avatarUrl}
+                alt={user?.displayName ?? user?.name ?? 'User avatar'}
+                className="h-full w-full object-cover"
+                onError={() => setFailedAvatarUrl(avatarUrl)}
+              />
+            ) : (
+              getInitials(user?.displayName ?? user?.name)
+            )}
           </button>
         </div>
       </div>

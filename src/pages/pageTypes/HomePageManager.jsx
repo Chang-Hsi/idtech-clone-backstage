@@ -5,7 +5,7 @@ import StatusMessage from '../../components/common/StatusMessage'
 import ConfirmDialog from '../../components/dialog/ConfirmDialog'
 import HomeHeroEditorDrawer from '../../components/pages/home/HomeHeroEditorDrawer'
 import HomeHeroListSection from '../../components/pages/home/HomeHeroListSection'
-import { useAuth } from '../../features/auth/AuthProvider'
+import { useAuth } from '../../features/auth/AuthContext'
 
 const createEmptySlide = () => ({
   id: `hero-${Date.now()}`,

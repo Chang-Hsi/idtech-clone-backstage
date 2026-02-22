@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Pagination from '../../common/Pagination'
 import DropdownSelect from '../../common/DropdownSelect'
 import StatusMessage from '../../common/StatusMessage'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import ConfirmDialog from '../../dialog/ConfirmDialog'
 import {
   archiveBackstageProduct,

@@ -1,7 +1,7 @@
 import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import FormField from '../../common/FormField'
 import DropdownSelect from '../../common/DropdownSelect'
 import StatusMessage from '../../common/StatusMessage'

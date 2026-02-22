@@ -7,7 +7,7 @@ import {
   updateBannerHubProductDetails,
   uploadDatasheetForProduct,
 } from '../../../api/backstageBannerHubApi'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import Pagination from '../../common/Pagination'
 import StatusMessage from '../../common/StatusMessage'
 import BannerHubRowEditorDrawer from './BannerHubRowEditorDrawer'

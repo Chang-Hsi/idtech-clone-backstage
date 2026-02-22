@@ -39,6 +39,21 @@ const toDeltaPercent = (history, key) => {
   return `${Math.abs(delta).toFixed(1)}%`
 }
 
+const getDisplayTrend = (history, key, fallbackTrend) => {
+  const list = Array.isArray(history) ? history : []
+  if (list.length < 2) return fallbackTrend
+
+  const current = Number(list[list.length - 1]?.[key] ?? NaN)
+  const previous = Number(list[list.length - 2]?.[key] ?? NaN)
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return fallbackTrend
+
+  // Keep icon/color consistent with the shown one-decimal KPI values.
+  const currentRounded = Number(current.toFixed(1))
+  const previousRounded = Number(previous.toFixed(1))
+  if (currentRounded === previousRounded) return 'flat'
+  return currentRounded > previousRounded ? 'up' : 'down'
+}
+
 const TestingKpiCard = ({ title, value, trend, deltaPercent }) => {
   const trendMeta = TREND_META[trend] ?? TREND_META.flat
   const TrendIcon = trendMeta.Icon
@@ -99,19 +114,19 @@ const DashboardTestingHealthPanel = ({
           <TestingKpiCard
             title="Backend Coverage"
             value={toPercent(summary.backendCoverage)}
-            trend={summary?.trend?.backendCoverage}
+            trend={getDisplayTrend(history, 'backendCoverage', summary?.trend?.backendCoverage)}
             deltaPercent={toDeltaPercent(history, 'backendCoverage')}
           />
           <TestingKpiCard
             title="Backstage Coverage"
             value={toPercent(summary.backstageCoverage)}
-            trend={summary?.trend?.backstageCoverage}
+            trend={getDisplayTrend(history, 'backstageCoverage', summary?.trend?.backstageCoverage)}
             deltaPercent={toDeltaPercent(history, 'backstageCoverage')}
           />
           <TestingKpiCard
             title="Pass Rate"
             value={toPercent(summary.passRate)}
-            trend={summary?.trend?.passRate}
+            trend={getDisplayTrend(history, 'passRate', summary?.trend?.passRate)}
             deltaPercent={toDeltaPercent(history, 'passRate')}
           />
         </div>

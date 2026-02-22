@@ -1,4 +1,4 @@
-import { useAuth } from '../features/auth/AuthProvider'
+import { useAuth } from '../features/auth/AuthContext'
 import StatusMessage from '../components/common/StatusMessage'
 import DashboardHeader from '../components/pages/dashboard/DashboardHeader'
 import DashboardKpiRow from '../components/pages/dashboard/DashboardKpiRow'

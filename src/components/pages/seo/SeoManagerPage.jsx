@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import DropdownSelect from '../../common/DropdownSelect'
 import FormField from '../../common/FormField'
 import StatusMessage from '../../common/StatusMessage'

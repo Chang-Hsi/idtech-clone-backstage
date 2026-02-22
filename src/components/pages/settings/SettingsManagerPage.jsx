@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../../features/auth/AuthProvider'
+import { useAuth } from '../../../features/auth/AuthContext'
 import StatusMessage from '../../common/StatusMessage'
 import CredentialsDialog from '../../dialog/CredentialsDialog'
 import ConfirmDialog from '../../dialog/ConfirmDialog'
