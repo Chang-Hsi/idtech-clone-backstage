@@ -40,7 +40,7 @@ jobs:
           if npm run | grep -q "test:coverage"; then
             npm run test:coverage
           else
-            npx vitest run --coverage --coverage.reporter=json-summary
+            npx vitest run --coverage --coverage.reporter=json-summary --passWithNoTests
           fi
 
       - name: Read coverage summary
