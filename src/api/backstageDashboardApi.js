@@ -16,7 +16,7 @@ export async function fetchBackstageDashboardTestingHealth() {
 export async function triggerBackstageDashboardTestingHealthRefresh() {
   const payload = await request('/api/backstage/dashboard/testing-health/trigger', {
     method: 'POST',
-    body: {},
+    body: JSON.stringify({}),
   })
   const data = payload?.data ?? {}
 
