@@ -33,7 +33,12 @@ jobs:
         run: npm ci
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        run: |
+          if npm run | grep -q "test:coverage"; then
+            npm run test:coverage
+          else
+            npx vitest run --coverage --coverage.reporter=json-summary
+          fi
 
       - name: Read coverage summary
         id: coverage
