@@ -1,48 +1,86 @@
-import { createContext, useContext, useMemo, useState } from 'react'
-import { clearAuthFromStorage, readAuthFromStorage, writeAuthToStorage } from './authStorage'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { fetchBackstageMe, loginBackstage, logoutBackstage } from '../../api/backstageAuthApi'
 
 const AuthContext = createContext(null)
 
-const MOCK_CREDENTIAL = {
-  email: 'admin@idtech.local',
-  password: '123456',
-  name: 'Backstage Admin',
+const initialState = {
+  isAuthenticated: false,
+  isInitializing: true,
+  user: null,
+  permissions: [],
+  mustResetPassword: false,
+  session: null,
 }
 
 export const AuthProvider = ({ children }) => {
-  const initialAuth = readAuthFromStorage()
-  const [authState, setAuthState] = useState(
-    initialAuth ?? {
-      isAuthenticated: false,
-      user: null,
+  const [authState, setAuthState] = useState(initialState)
+
+  useEffect(() => {
+    let mounted = true
+
+    const bootstrap = async () => {
+      try {
+        const payload = await fetchBackstageMe()
+        if (!mounted) return
+        setAuthState({
+          isAuthenticated: true,
+          isInitializing: false,
+          user: payload?.data?.user ?? null,
+          permissions: Array.isArray(payload?.data?.permissions) ? payload.data.permissions : [],
+          mustResetPassword: Boolean(payload?.data?.mustResetPassword),
+          session: payload?.data?.session ?? null,
+        })
+      } catch {
+        if (!mounted) return
+        setAuthState({
+          isAuthenticated: false,
+          isInitializing: false,
+          user: null,
+          permissions: [],
+          mustResetPassword: false,
+          session: null,
+        })
+      }
     }
-  )
+
+    bootstrap()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const login = async ({ email, password }) => {
-    if (email !== MOCK_CREDENTIAL.email || password !== MOCK_CREDENTIAL.password) {
-      throw new Error('Invalid credentials')
-    }
+    const payload = await loginBackstage({ email, password })
 
     const nextState = {
       isAuthenticated: true,
-      user: {
-        email: MOCK_CREDENTIAL.email,
-        name: MOCK_CREDENTIAL.name,
-      },
+      isInitializing: false,
+      user: payload?.data?.user ?? null,
+      permissions: Array.isArray(payload?.data?.permissions) ? payload.data.permissions : [],
+      mustResetPassword: Boolean(payload?.data?.mustResetPassword),
+      session: payload?.data?.session ?? null,
     }
 
     setAuthState(nextState)
-    writeAuthToStorage(nextState)
     return nextState
   }
 
-  const logout = () => {
-    const nextState = {
-      isAuthenticated: false,
-      user: null,
+  const logout = async () => {
+    try {
+      await logoutBackstage()
+    } catch {
+      // ignore logout network errors and clear local auth state anyway
     }
-    setAuthState(nextState)
-    clearAuthFromStorage()
+
+    setAuthState({
+      isAuthenticated: false,
+      isInitializing: false,
+      user: null,
+      permissions: [],
+      mustResetPassword: false,
+      session: null,
+    })
   }
 
   const value = useMemo(
@@ -51,7 +89,7 @@ export const AuthProvider = ({ children }) => {
       login,
       logout,
     }),
-    [authState]
+    [authState],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -10,11 +10,15 @@ const ConfirmDialog = ({
   onConfirm,
   onCancel,
 }) => {
-  if (!isOpen) return null
-
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('ui:close-popovers'))
-  }, [])
+    if (!isOpen) return undefined
+    const frameId = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new CustomEvent('ui:close-popovers'))
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [isOpen])
+
+  if (!isOpen) return null
 
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/55 p-4">

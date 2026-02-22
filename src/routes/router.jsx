@@ -24,6 +24,7 @@ import CompanyCareersPageManager from '../pages/contentTypes/CompanyCareersPageM
 import CompanyCareerCreatePageManager from '../pages/contentTypes/CompanyCareerCreatePageManager'
 import CompanyCareerEditPageManager from '../pages/contentTypes/CompanyCareerEditPageManager'
 import SeoPageManager from '../pages/seo/SeoPageManager'
+import SettingsPageManager from '../pages/settings/SettingsPageManager'
 import PlaceholderPage from '../pages/PlaceholderPage'
 import RequireAuth from './guards/RequireAuth'
 import RequireGuest from './guards/RequireGuest'
@@ -230,6 +231,48 @@ const pageRoutes = [
     title: 'Settings',
     description: 'System settings, profile, and backstage preferences.',
     primaryNav: 'settings',
+    secondaryNav: 'settings',
+    element: <Navigate to="/settings/profile" replace />,
+  },
+  {
+    path: 'settings/profile',
+    title: 'Profile Settings',
+    description: 'Manage profile information and password.',
+    primaryNav: 'settings',
+    secondaryNav: 'settings',
+    element: <SettingsPageManager />,
+  },
+  {
+    path: 'settings/roles',
+    title: 'Roles & Permissions',
+    description: 'Manage roles and permission matrix.',
+    primaryNav: 'settings',
+    secondaryNav: 'settings',
+    element: <SettingsPageManager />,
+  },
+  {
+    path: 'settings/employees',
+    title: 'Employees',
+    description: 'Manage employee accounts and role assignments.',
+    primaryNav: 'settings',
+    secondaryNav: 'settings',
+    element: <SettingsPageManager />,
+  },
+  {
+    path: 'settings/security',
+    title: 'Security Policies',
+    description: 'Manage password and login security policies.',
+    primaryNav: 'settings',
+    secondaryNav: 'settings',
+    element: <SettingsPageManager />,
+  },
+  {
+    path: 'settings/audit',
+    title: 'Audit Logs',
+    description: 'Review settings and RBAC activity logs.',
+    primaryNav: 'settings',
+    secondaryNav: 'settings',
+    element: <SettingsPageManager />,
   },
 ]
 
