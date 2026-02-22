@@ -3,6 +3,20 @@ import { Link } from 'react-router-dom'
 import DropdownSelect from '../../common/DropdownSelect'
 
 const getCountryNameFromFeature = (feature) => String(feature?.properties?.name ?? '').trim()
+const normalizeCountryKey = (value) => {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  if (!normalized) return ''
+  if (
+    normalized === 'usa' ||
+    normalized === 'us' ||
+    normalized === 'united states' ||
+    normalized === 'united states of america'
+  ) {
+    return 'usa'
+  }
+  return normalized
+}
+const isSameCountry = (left, right) => normalizeCountryKey(left) === normalizeCountryKey(right)
 
 const DashboardGeoDistributionPanel = ({
   features,
@@ -47,7 +61,7 @@ const DashboardGeoDistributionPanel = ({
               colors="blues"
               label={(feature) => getCountryNameFromFeature(feature)}
               value="value"
-              match={(feature, datum) => getCountryNameFromFeature(feature) === String(datum?.id ?? '')}
+              match={(feature, datum) => isSameCountry(getCountryNameFromFeature(feature), String(datum?.id ?? ''))}
               projectionType="naturalEarth1"
               projectionScale={130}
               borderWidth={0.8}
@@ -61,7 +75,7 @@ const DashboardGeoDistributionPanel = ({
               )}
               onClick={(feature) => {
                 const name = String(feature?.label ?? '')
-                const target = regions.find((region) => region.countryName === name)
+                const target = regions.find((region) => isSameCountry(region.countryName, name))
                 if (target?.regionCode) {
                   onSelectRegion(target.regionCode)
                 }

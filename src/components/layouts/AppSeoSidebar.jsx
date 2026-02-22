@@ -1,6 +1,6 @@
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchBackstageSeoTargets } from '../../api/backstageSeoApi'
 import DropdownSelect from '../common/DropdownSelect'
 import ConfirmDialog from '../dialog/ConfirmDialog'
@@ -26,8 +26,10 @@ const PAGE_SIZE = 80
 
 const AppSeoSidebar = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const selectedTargetKey = searchParams.get('target') ?? ''
+  const isScoreRecordsRoute = location.pathname.startsWith('/seo/score-records')
 
   const [status, setStatus] = useState('loading')
   const [errorMessage, setErrorMessage] = useState('')
@@ -92,6 +94,7 @@ const AppSeoSidebar = () => {
   }, [])
 
   useEffect(() => {
+    if (isScoreRecordsRoute) return
     if (status !== 'success') return
     if (targets.length === 0) return
     if (selectedTargetKey && targets.some((item) => item.targetKey === selectedTargetKey)) return
@@ -99,7 +102,7 @@ const AppSeoSidebar = () => {
     const params = new URLSearchParams(searchParams)
     params.set('target', targets[0].targetKey)
     navigate(`/seo?${params.toString()}`, { replace: true })
-  }, [navigate, searchParams, selectedTargetKey, status, targets])
+  }, [isScoreRecordsRoute, navigate, searchParams, selectedTargetKey, status, targets])
 
   const groupedTargets = useMemo(() => {
     const pageItems = targets.filter((item) => item.entityType === 'page')
@@ -134,6 +137,32 @@ const AppSeoSidebar = () => {
       </div>
 
       <div className="h-[calc(100vh-88px)] space-y-5 overflow-y-auto p-5">
+        <nav className="space-y-1">
+          <button
+            type="button"
+            onClick={() => navigate('/seo/score-records')}
+            className={`w-full rounded-md px-3 py-2 text-left text-sm transition ${
+              isScoreRecordsRoute
+                ? 'bg-indigo-100 font-medium text-indigo-700'
+                : 'text-slate-700 hover:bg-white hover:text-slate-900'
+            }`}
+          >
+            Score Records
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/seo')}
+            className={`w-full rounded-md px-3 py-2 text-left text-sm transition ${
+              !isScoreRecordsRoute
+                ? 'bg-indigo-100 font-medium text-indigo-700'
+                : 'text-slate-700 hover:bg-white hover:text-slate-900'
+            }`}
+          >
+            SEO Targets
+          </button>
+        </nav>
+
+        {!isScoreRecordsRoute ? (
         <div className="space-y-2">
           <div className="relative">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -159,12 +188,13 @@ const AppSeoSidebar = () => {
             placeholder="Type filter"
           />
         </div>
+        ) : null}
 
-        {status === 'error' ? (
+        {!isScoreRecordsRoute && status === 'error' ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{errorMessage}</div>
         ) : null}
 
-        {groupedTargets.map((group) => (
+        {!isScoreRecordsRoute ? groupedTargets.map((group) => (
           <section key={group.title} className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.title}</h3>
             <nav className="space-y-1">
@@ -202,9 +232,9 @@ const AppSeoSidebar = () => {
               ) : null}
             </nav>
           </section>
-        ))}
+        )) : null}
 
-        {targets.length < total ? (
+        {!isScoreRecordsRoute && targets.length < total ? (
           <button
             type="button"
             onClick={() => load({ nextOffset: offset + PAGE_SIZE, append: true })}

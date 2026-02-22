@@ -24,6 +24,7 @@ import CompanyCareersPageManager from '../pages/contentTypes/CompanyCareersPageM
 import CompanyCareerCreatePageManager from '../pages/contentTypes/CompanyCareerCreatePageManager'
 import CompanyCareerEditPageManager from '../pages/contentTypes/CompanyCareerEditPageManager'
 import SeoPageManager from '../pages/seo/SeoPageManager'
+import SeoScoreRecordsPageManager from '../pages/seo/SeoScoreRecordsPageManager'
 import SettingsPageManager from '../pages/settings/SettingsPageManager'
 import PlaceholderPage from '../pages/PlaceholderPage'
 import DashboardPageManager from '../pages/DashboardPageManager'
@@ -220,6 +221,13 @@ const pageRoutes = [
     description: 'Content-type management for career job postings.',
     primaryNav: 'pages',
     secondaryNav: 'pages',
+  },
+  {
+    path: 'seo/score-records',
+    title: 'SEO Score Records',
+    description: 'Lighthouse CI score records and trend monitoring.',
+    primaryNav: 'seo',
+    element: <SeoScoreRecordsPageManager />,
   },
   {
     path: 'seo',

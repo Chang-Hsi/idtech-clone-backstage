@@ -37,3 +37,24 @@ export async function resetBackstageSeoTargetFallback(targetKey, payload = {}) {
     body: JSON.stringify(payload),
   })
 }
+
+export async function fetchBackstageSeoScoreRecords({
+  repository = 'Chang-Hsi/idtech-clone',
+  pullRequestNumber = '',
+  targetUrl = '',
+  limit = 30,
+  offset = 0,
+} = {}) {
+  const search = new URLSearchParams({
+    repository: String(repository ?? '').trim() || 'Chang-Hsi/idtech-clone',
+    limit: String(limit),
+    offset: String(offset),
+  })
+  if (String(pullRequestNumber ?? '').trim()) {
+    search.set('pullRequestNumber', String(pullRequestNumber).trim())
+  }
+  if (String(targetUrl ?? '').trim()) {
+    search.set('targetUrl', String(targetUrl).trim())
+  }
+  return request(`/api/backstage/seo/score-records?${search.toString()}`, { cache: 'no-store' })
+}

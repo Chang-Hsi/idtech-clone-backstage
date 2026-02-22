@@ -17,8 +17,8 @@ import {
 import { formatDateTime } from '../../../utils/formatters'
 
 const TREND_META = {
-  up: { label: 'Up', className: 'text-emerald-600', Icon: ArrowTrendingDownIcon },
-  down: { label: 'Down', className: 'text-rose-600', Icon: ArrowTrendingUpIcon },
+  up: { label: 'Up', className: 'text-emerald-600', Icon: ArrowTrendingUpIcon },
+  down: { label: 'Down', className: 'text-rose-600', Icon: ArrowTrendingDownIcon },
   flat: { label: 'Flat', className: 'text-slate-500', Icon: ArrowLongRightIcon },
 }
 
@@ -34,8 +34,7 @@ const toDeltaPercent = (history, key) => {
   const current = Number(list[list.length - 1]?.[key] ?? NaN)
   const previous = Number(list[list.length - 2]?.[key] ?? NaN)
   if (!Number.isFinite(current) || !Number.isFinite(previous)) return '--'
-  if (Math.abs(previous) < Number.EPSILON) return current === 0 ? '0.0%' : '--'
-  const delta = ((current - previous) / Math.abs(previous)) * 100
+  const delta = current - previous
   return `${Math.abs(delta).toFixed(1)}%`
 }
 
