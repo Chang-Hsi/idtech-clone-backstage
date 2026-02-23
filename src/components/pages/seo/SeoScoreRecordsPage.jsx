@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { fetchBackstageSeoScoreRecords } from '../../../api/backstageSeoApi'
+import { fetchBackstageSeoScoreRecords, triggerBackstageSeoLighthouseWorkflow } from '../../../api/backstageSeoApi'
 import StatusMessage from '../../common/StatusMessage'
 
 const formatDateTime = (value) => {
@@ -41,6 +41,22 @@ const ScoreCard = ({ label, value }) => (
   </div>
 )
 
+const RUN_STATUS_LABEL = {
+  queued: 'Queued',
+  running: 'Running',
+  success: 'Success',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+}
+
+const RUN_STATUS_CLASS = {
+  queued: 'bg-amber-100 text-amber-700',
+  running: 'bg-sky-100 text-sky-700',
+  success: 'bg-emerald-100 text-emerald-700',
+  failed: 'bg-red-100 text-red-700',
+  cancelled: 'bg-slate-200 text-slate-700',
+}
+
 const SeoScoreRecordsPage = () => {
   const [status, setStatus] = useState('loading')
   const [errorMessage, setErrorMessage] = useState('')
@@ -50,10 +66,16 @@ const SeoScoreRecordsPage = () => {
   const [summary, setSummary] = useState(null)
   const [history, setHistory] = useState([])
   const [records, setRecords] = useState([])
+  const [ciRuns, setCiRuns] = useState([])
+  const [trigger, setTrigger] = useState(null)
+  const [isTriggering, setIsTriggering] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  const load = async () => {
-    setStatus('loading')
-    setErrorMessage('')
+  const load = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setStatus('loading')
+      setErrorMessage('')
+    }
     try {
       const payload = await fetchBackstageSeoScoreRecords({
         repository,
@@ -65,6 +87,8 @@ const SeoScoreRecordsPage = () => {
       setSummary(payload?.data?.summary ?? null)
       setHistory(Array.isArray(payload?.data?.history) ? payload.data.history : [])
       setRecords(Array.isArray(payload?.data?.records) ? payload.data.records : [])
+      setCiRuns(Array.isArray(payload?.data?.ciRuns) ? payload.data.ciRuns : [])
+      setTrigger(payload?.data?.trigger ?? null)
       setStatus('success')
     } catch (error) {
       setStatus('error')
@@ -77,6 +101,15 @@ const SeoScoreRecordsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!trigger?.isRunning) return undefined
+    const timer = window.setInterval(() => {
+      void load({ silent: true })
+    }, 8000)
+    return () => window.clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trigger?.isRunning, repository, pullRequestNumber, targetUrl])
+
   const chartData = useMemo(
     () =>
       history.map((item) => ({
@@ -85,6 +118,24 @@ const SeoScoreRecordsPage = () => {
       })),
     [history],
   )
+
+  const triggerWorkflow = async () => {
+    if (isTriggering) return
+    setIsTriggering(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const payload = await triggerBackstageSeoLighthouseWorkflow()
+      const run = payload?.data?.run
+      setSuccessMessage(run?.triggerId ? `CI workflow queued (triggerId: ${run.triggerId.slice(0, 8)}...).` : 'CI workflow queued.')
+      await load({ silent: true })
+    } catch (error) {
+      setErrorMessage(error?.message || 'Unable to trigger Lighthouse CI workflow.')
+      await load({ silent: true })
+    } finally {
+      setIsTriggering(false)
+    }
+  }
 
   return (
     <section className="space-y-4">
@@ -125,11 +176,20 @@ const SeoScoreRecordsPage = () => {
         >
           Refresh
         </button>
+        <button
+          type="button"
+          onClick={triggerWorkflow}
+          disabled={isTriggering || Boolean(trigger?.isRunning)}
+          className="ml-2 mt-3 inline-flex h-9 items-center rounded-md border border-red-300 bg-red-500 px-3 text-sm font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isTriggering ? 'Triggering...' : trigger?.isRunning ? 'CI Running...' : 'Run CI Workflow'}
+        </button>
       </div>
 
       {errorMessage ? (
-        <StatusMessage variant="error" message={errorMessage} onClose={() => setErrorMessage('')} />
+        <StatusMessage tone="error" message={errorMessage} />
       ) : null}
+      {successMessage ? <StatusMessage tone="success" message={successMessage} /> : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <ScoreCard label="Performance" value={toFixedValue(summary?.performanceScore, 1)} />
@@ -211,6 +271,60 @@ const SeoScoreRecordsPage = () => {
                         '-'
                       )}
                     </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">CI Runs</h2>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[980px] table-fixed text-left text-xs text-slate-700">
+            <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Requested</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Workflow</th>
+                <th className="px-3 py-2">Run</th>
+                <th className="px-3 py-2">Failure Step</th>
+                <th className="px-3 py-2">Failure Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ciRuns.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-5 text-center text-sm text-slate-500">
+                    No CI run records.
+                  </td>
+                </tr>
+              ) : (
+                ciRuns.map((run) => (
+                  <tr key={run.id} className="border-t border-slate-100">
+                    <td className="px-3 py-2">{formatDateTime(run.requestedAt)}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          RUN_STATUS_CLASS[run.status] ?? 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {RUN_STATUS_LABEL[run.status] ?? run.status ?? '-'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">{run.workflowId || '-'}</td>
+                    <td className="px-3 py-2">
+                      {run.runUrl ? (
+                        <a href={run.runUrl} target="_blank" rel="noreferrer" className="font-medium text-indigo-600 hover:text-indigo-500">
+                          Open
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="truncate px-3 py-2 text-red-700">{run.failureStep || '-'}</td>
+                    <td className="truncate px-3 py-2 text-red-700">{run.failureReason || '-'}</td>
                   </tr>
                 ))
               )}

@@ -295,3 +295,34 @@ Goal: move high-risk write payload validation to a single contract source shared
   - `@chang-hsi:registry=https://npm.pkg.github.com`
 - CI must provide auth token for GitHub Packages (read package):
   - set `NODE_AUTH_TOKEN` (or run npm config for `//npm.pkg.github.com/:_authToken`)
+
+## SEO Score Records Page（已落地）
+
+### 建置目的
+
+- 將前台 Lighthouse CI 的結果在後台可視化。
+- 讓性能/SEO 不是一次性檢查，而是可持續監控。
+
+### 資訊架構
+
+入口：
+- `AppSeoSidebar.jsx` 新增 `Score Records` 導航
+- 路由：`/seo/score-records`
+
+頁面：
+1. 上區塊：分數卡片（Performance、LCP、CLS、FID-like 等）
+2. 中區塊：Recharts 趨勢圖（按時間）
+3. 下區塊：紀錄表格（來源、分支、commit、run 連結、時間）
+
+### 資料來源
+
+- API：`GET /api/backstage/seo/score-records`
+- 前端 API module：`src/api/backstageSeoApi.js`
+- 頁面管理器：`src/pages/seo/SeoScoreRecordsPageManager.jsx`
+- 視覺元件：`src/components/pages/seo/SeoScoreRecordsPage.jsx`
+
+### 設計原則
+
+- 以「可追蹤」優先：同時提供 summary、trend、raw records。
+- 卡片與圖表使用同一批 API 資料，避免數字不一致。
+- 保留 run 連結，方便追到 GitHub Actions 原始執行紀錄。

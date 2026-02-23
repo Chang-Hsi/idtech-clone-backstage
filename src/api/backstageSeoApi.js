@@ -58,3 +58,10 @@ export async function fetchBackstageSeoScoreRecords({
   }
   return request(`/api/backstage/seo/score-records?${search.toString()}`, { cache: 'no-store' })
 }
+
+export async function triggerBackstageSeoLighthouseWorkflow({ force = false } = {}) {
+  return request('/api/backstage/seo/score-records/trigger-lhci', {
+    method: 'POST',
+    body: JSON.stringify({ force: Boolean(force) }),
+  })
+}
