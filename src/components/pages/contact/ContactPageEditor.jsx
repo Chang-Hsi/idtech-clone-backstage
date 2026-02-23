@@ -20,10 +20,12 @@ import { useAuth } from '../../../features/auth/AuthContext'
 import FormField from '../../common/FormField'
 import DropdownSelect from '../../common/DropdownSelect'
 import StatusMessage from '../../common/StatusMessage'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import {
   fetchBackstageContactPage,
   updateBackstageContactPage,
 } from '../../../api/backstageContactPageApi'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import useFormValidation from '../../../hooks/useFormValidation'
 import {
   INQUIRY_TYPE_OPTIONS,
@@ -328,6 +330,10 @@ const ContactPageEditor = () => {
 
   const [heroPreviewUrl, setHeroPreviewUrl] = useState('')
   const [heroPreviewStatus, setHeroPreviewStatus] = useState('idle')
+  const [heroImageInputMode, setHeroImageInputMode] = useState('url')
+  const [heroImageUploadFile, setHeroImageUploadFile] = useState(null)
+  const [heroImageUploadError, setHeroImageUploadError] = useState('')
+  const [heroImageUploadPreviewUrl, setHeroImageUploadPreviewUrl] = useState('')
 
   const [inquiryDialog, setInquiryDialog] = useState({
     isOpen: false,
@@ -412,8 +418,50 @@ const ContactPageEditor = () => {
     }
   }, [heroPreviewUrl])
 
+  useEffect(() => {
+    return () => {
+      if (heroImageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(heroImageUploadPreviewUrl)
+      }
+    }
+  }, [heroImageUploadPreviewUrl])
+
   const updateHeroField = (field, value) => {
     setForm((prev) => ({ ...prev, hero: { ...prev.hero, [field]: value } }))
+  }
+
+  const clearHeroImageUploadSelection = () => {
+    if (heroImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(heroImageUploadPreviewUrl)
+    }
+    setHeroImageUploadPreviewUrl('')
+    setHeroImageUploadFile(null)
+    setHeroImageUploadError('')
+  }
+
+  const handleHeroImageModeChange = (mode) => {
+    if (mode === heroImageInputMode) return
+    setHeroImageInputMode(mode)
+    if (mode === 'url') {
+      clearHeroImageUploadSelection()
+      return
+    }
+    updateHeroField('imageUrl', '')
+  }
+
+  const handleHeroImageFileChange = (file) => {
+    if (heroImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(heroImageUploadPreviewUrl)
+    }
+    if (!file) {
+      setHeroImageUploadPreviewUrl('')
+      setHeroImageUploadFile(null)
+      setHeroImageUploadError('')
+      return
+    }
+    setHeroImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setHeroImageUploadFile(file)
+    setHeroImageUploadError('')
   }
 
   const updateAddressField = (field, value) => {
@@ -592,18 +640,33 @@ const ContactPageEditor = () => {
   }
 
   const save = async () => {
+    const validationForm = {
+      ...form,
+      hero: {
+        ...form.hero,
+        imageUrl:
+          heroImageInputMode === 'upload' && heroImageUploadFile && !form.hero.imageUrl
+            ? 'https://upload.pending.local/contact-hero.webp'
+            : form.hero.imageUrl,
+      },
+    }
     const quickValid = validateMany(
       validationSchema.map((field) => ({
         name: field.name,
-        validate: () => validateSchemaField(validationSchema, form, field.name),
+        validate: () => validateSchemaField(validationSchema, validationForm, field.name),
       }))
     )
-    const validation = validateSchema(validationSchema, form)
+    const validation = validateSchema(validationSchema, validationForm)
     if (!quickValid || !validation.valid) {
       setStatus('error')
       setErrorMessage('Please fix the validation errors before saving.')
       setValidationErrors(validation.errors)
       setSuccessMessage('')
+      return
+    }
+    if (heroImageInputMode === 'upload' && !heroImageUploadFile) {
+      setStatus('error')
+      setHeroImageUploadError('Please choose an image file before saving.')
       return
     }
 
@@ -613,8 +676,24 @@ const ContactPageEditor = () => {
     setSuccessMessage('')
 
     try {
+      let resolvedHeroImageUrl = String(form.hero.imageUrl ?? '').trim()
+      if (heroImageInputMode === 'upload' && heroImageUploadFile) {
+        const uploadResponse = await uploadBackstageImage({
+          file: heroImageUploadFile,
+          category: 'contact',
+          updatedBy: editorId,
+        })
+        resolvedHeroImageUrl = String(uploadResponse?.data?.url ?? '').trim()
+      }
+      const nextFormForSave = {
+        ...form,
+        hero: {
+          ...form.hero,
+          imageUrl: resolvedHeroImageUrl,
+        },
+      }
       const payload = await updateBackstageContactPage({
-        ...toPayload(form),
+        ...toPayload(nextFormForSave),
         updatedBy: editorId,
       })
 
@@ -724,18 +803,20 @@ const ContactPageEditor = () => {
                 />
               </FormField>
 
-              <FormField
+              <ImageSourceInputField
                 label="Image URL"
                 required
-                error={getFieldError('hero.imageUrl')}
-              >
-                <input
-                  value={form.hero.imageUrl}
-                  onChange={(event) => updateHeroField('imageUrl', event.target.value)}
-                  onBlur={() => validateByFieldName('hero.imageUrl')}
-                  className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-                />
-              </FormField>
+                mode={heroImageInputMode}
+                onModeChange={handleHeroImageModeChange}
+                urlValue={form.hero.imageUrl}
+                onUrlChange={(nextValue) => updateHeroField('imageUrl', nextValue)}
+                onUrlBlur={() => validateByFieldName('hero.imageUrl')}
+                urlError={getFieldError('hero.imageUrl')}
+                uploadFile={heroImageUploadFile}
+                onUploadFileChange={handleHeroImageFileChange}
+                onClearUploadFile={clearHeroImageUploadSelection}
+                uploadError={heroImageUploadError}
+              />
               <FormField
                 label="Image Alt"
                 required
@@ -752,7 +833,13 @@ const ContactPageEditor = () => {
               <div className="space-y-2 text-sm md:col-span-2">
                 <p className="font-medium text-slate-700">Background Preview</p>
                 <div className="overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                  {heroPreviewStatus === 'loaded' ? (
+                  {heroImageInputMode === 'upload' && heroImageUploadPreviewUrl ? (
+                    <img
+                      src={heroImageUploadPreviewUrl}
+                      alt={form.hero.imageAlt || 'Hero background preview'}
+                      className="h-56 w-full object-cover"
+                    />
+                  ) : heroPreviewStatus === 'loaded' ? (
                     <img
                       src={heroPreviewUrl}
                       alt={form.hero.imageAlt || 'Hero background preview'}

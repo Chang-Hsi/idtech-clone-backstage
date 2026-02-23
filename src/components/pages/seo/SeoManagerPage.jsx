@@ -4,6 +4,7 @@ import { useAuth } from '../../../features/auth/AuthContext'
 import DropdownSelect from '../../common/DropdownSelect'
 import FormField from '../../common/FormField'
 import StatusMessage from '../../common/StatusMessage'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import ConfirmDialog from '../../dialog/ConfirmDialog'
 import useFormValidation from '../../../hooks/useFormValidation'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
@@ -12,6 +13,7 @@ import {
   resetBackstageSeoTargetFallback,
   updateBackstageSeoTarget,
 } from '../../../api/backstageSeoApi'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import {
   ROBOTS_OPTIONS,
   SEO_TYPE_OPTIONS,
@@ -49,6 +51,10 @@ const SeoManagerPage = () => {
 
   const [previewUrl, setPreviewUrl] = useState('')
   const [previewState, setPreviewState] = useState('idle')
+  const [ogImageInputMode, setOgImageInputMode] = useState('url')
+  const [ogImageUploadFile, setOgImageUploadFile] = useState(null)
+  const [ogImageUploadError, setOgImageUploadError] = useState('')
+  const [ogImageUploadPreviewUrl, setOgImageUploadPreviewUrl] = useState('')
   const previewImgRef = useRef(null)
   const detailRequestIdRef = useRef(0)
 
@@ -87,6 +93,40 @@ const SeoManagerPage = () => {
     setPreviewState('loading')
   }
 
+  const clearOgImageUploadSelection = () => {
+    if (ogImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(ogImageUploadPreviewUrl)
+    }
+    setOgImageUploadPreviewUrl('')
+    setOgImageUploadFile(null)
+    setOgImageUploadError('')
+  }
+
+  const handleOgImageModeChange = (mode) => {
+    if (mode === ogImageInputMode) return
+    setOgImageInputMode(mode)
+    if (mode === 'url') {
+      clearOgImageUploadSelection()
+      return
+    }
+    updateSeoField('ogImageUrl', '')
+  }
+
+  const handleOgImageFileChange = (file) => {
+    if (ogImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(ogImageUploadPreviewUrl)
+    }
+    if (!file) {
+      setOgImageUploadPreviewUrl('')
+      setOgImageUploadFile(null)
+      setOgImageUploadError('')
+      return
+    }
+    setOgImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setOgImageUploadFile(file)
+    setOgImageUploadError('')
+  }
+
   const updateSeoField = (field, value) => {
     setForm((prev) => ({
       ...prev,
@@ -104,6 +144,8 @@ const SeoManagerPage = () => {
   const applyTargetDetail = (detail) => {
     setSelectedTargetDetail(detail)
     setForm({ seo: { ...(detail?.seo ?? createEmptyForm().seo) } })
+    setOgImageInputMode('url')
+    clearOgImageUploadSelection()
     clearAll()
     setValidationErrors([])
 
@@ -117,6 +159,9 @@ const SeoManagerPage = () => {
     const requestId = detailRequestIdRef.current + 1
     detailRequestIdRef.current = requestId
 
+    setOgImageInputMode('url')
+    clearOgImageUploadSelection()
+
     if (!targetKey) {
       setSelectedTargetDetail(null)
       setForm(createEmptyForm())
@@ -129,6 +174,8 @@ const SeoManagerPage = () => {
     setStatus('loading')
     setErrorMessage('')
     setSuccessMessage('')
+    setPreviewUrl('')
+    setPreviewState('idle')
 
     try {
       const payload = await fetchBackstageSeoTargetDetail(targetKey)
@@ -168,11 +215,29 @@ const SeoManagerPage = () => {
     [],
   )
 
+  useEffect(() => {
+    return () => {
+      if (ogImageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(ogImageUploadPreviewUrl)
+      }
+    }
+  }, [ogImageUploadPreviewUrl])
+
   const validateBeforeSave = () => {
-    const validation = validateSchema(seoEditorSchema, form)
+    const validationForm = {
+      ...form,
+      seo: {
+        ...form.seo,
+        ogImageUrl:
+          ogImageInputMode === 'upload' && ogImageUploadFile && !form?.seo?.ogImageUrl
+            ? 'https://upload.pending.local/seo-og.webp'
+            : form?.seo?.ogImageUrl,
+      },
+    }
+    const validation = validateSchema(seoEditorSchema, validationForm)
     const fieldValidators = seoEditorSchema.map((item) => ({
       name: item.name,
-      validate: () => validateSchemaField(seoEditorSchema, form, item.name),
+      validate: () => validateSchemaField(seoEditorSchema, validationForm, item.name),
     }))
     validateMany(fieldValidators)
     setValidationErrors(validation.errors)
@@ -196,8 +261,22 @@ const SeoManagerPage = () => {
     setSuccessMessage('')
 
     try {
+      let resolvedOgImageUrl = String(form?.seo?.ogImageUrl ?? '').trim()
+      if (ogImageInputMode === 'upload') {
+        if (!ogImageUploadFile) {
+          setOgImageUploadError('Please choose an image file before saving.')
+          setStatus('error')
+          return
+        }
+        const uploadResponse = await uploadBackstageImage({
+          file: ogImageUploadFile,
+          category: 'seo',
+          updatedBy: editorId,
+        })
+        resolvedOgImageUrl = String(uploadResponse?.data?.url ?? '').trim()
+      }
       const result = await updateBackstageSeoTarget(selectedTargetKey, {
-        seo: { ...(form?.seo ?? {}) },
+        seo: { ...(form?.seo ?? {}), ogImageUrl: resolvedOgImageUrl },
         updatedBy: editorId,
       })
       const responseTarget = result?.data?.target ?? null
@@ -344,22 +423,27 @@ const SeoManagerPage = () => {
               />
             </FormField>
 
-            <FormField label={renderLabelWithSource('OG Image URL', 'ogImageUrl')} className="md:col-span-2" error={getFieldError('seo.ogImageUrl')}>
-              <input
-                value={form.seo.ogImageUrl}
-                onChange={(event) => updateSeoField('ogImageUrl', event.target.value)}
-                onBlur={() => {
-                  syncPreviewAfterBlur()
-                  validateByFieldName('seo.ogImageUrl')
-                }}
-                placeholder="https://..."
-                className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-              />
-            </FormField>
+            <ImageSourceInputField
+              label="OG Image URL"
+              className="md:col-span-2"
+              mode={ogImageInputMode}
+              onModeChange={handleOgImageModeChange}
+              urlValue={form.seo.ogImageUrl}
+              onUrlChange={(nextValue) => updateSeoField('ogImageUrl', nextValue)}
+              onUrlBlur={() => {
+                syncPreviewAfterBlur()
+                validateByFieldName('seo.ogImageUrl')
+              }}
+              urlError={getFieldError('seo.ogImageUrl')}
+              uploadFile={ogImageUploadFile}
+              onUploadFileChange={handleOgImageFileChange}
+              onClearUploadFile={clearOgImageUploadSelection}
+              uploadError={ogImageUploadError}
+            />
 
             <div className="md:col-span-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="text-sm font-medium text-slate-700">Image Preview</p>
-              {!previewUrl ? (
+              {!(ogImageInputMode === 'upload' && ogImageUploadPreviewUrl) && !previewUrl ? (
                 <div className="flex h-36 w-36 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-xs text-slate-500">
                   No image URL
                 </div>
@@ -372,7 +456,11 @@ const SeoManagerPage = () => {
                   ) : null}
                   <img
                     ref={previewImgRef}
-                    src={previewUrl}
+                    src={
+                      ogImageInputMode === 'upload' && ogImageUploadPreviewUrl
+                        ? ogImageUploadPreviewUrl
+                        : previewUrl
+                    }
                     alt="SEO OG preview"
                     className={`h-full w-full object-cover ${previewState === 'error' ? 'hidden' : ''}`}
                     onLoad={() => setPreviewState('loaded')}

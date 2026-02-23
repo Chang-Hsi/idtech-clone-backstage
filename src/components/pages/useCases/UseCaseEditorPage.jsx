@@ -5,6 +5,7 @@ import { useAuth } from '../../../features/auth/AuthContext'
 import FormField from '../../common/FormField'
 import DropdownSelect from '../../common/DropdownSelect'
 import StatusMessage from '../../common/StatusMessage'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import useFormValidation from '../../../hooks/useFormValidation'
 import {
   createBackstageUseCase,
@@ -12,6 +13,7 @@ import {
   fetchBackstageUseCaseProductOptions,
   updateBackstageUseCase,
 } from '../../../api/backstageContentUseCasesApi'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
 import { buildUseCaseEditorValidationSchema } from './UseCaseEditorPage.schema'
 
@@ -28,7 +30,7 @@ const UseCaseEditorPage = ({ mode }) => {
   const navigate = useNavigate()
   const { slug } = useParams()
   const { user } = useAuth()
-  const { clearAll, getFieldError, validateField, validateMany } = useFormValidation()
+  const { clearAll, getFieldError, validateField } = useFormValidation()
   const editorId = useMemo(() => user?.email ?? user?.name ?? 'unknown-editor', [user])
 
   const [status, setStatus] = useState('idle')
@@ -42,6 +44,10 @@ const UseCaseEditorPage = ({ mode }) => {
   const [backgroundPreviewState, setBackgroundPreviewState] = useState('idle')
   const previewBlurTimerRef = useRef(null)
   const previewImgRef = useRef(null)
+  const [imageInputMode, setImageInputMode] = useState('url')
+  const [imageUploadFile, setImageUploadFile] = useState(null)
+  const [imageUploadError, setImageUploadError] = useState('')
+  const [imageUploadPreviewUrl, setImageUploadPreviewUrl] = useState('')
 
   const [productOptions, setProductOptions] = useState([])
   const [availableQuery, setAvailableQuery] = useState('')
@@ -112,8 +118,11 @@ const UseCaseEditorPage = ({ mode }) => {
   useEffect(() => {
     return () => {
       if (previewBlurTimerRef.current) clearTimeout(previewBlurTimerRef.current)
+      if (imageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(imageUploadPreviewUrl)
+      }
     }
-  }, [])
+  }, [imageUploadPreviewUrl])
 
   useEffect(() => {
     if (!backgroundPreviewUrl) {
@@ -248,19 +257,59 @@ const UseCaseEditorPage = ({ mode }) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  const clearImageUploadSelection = () => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    setImageUploadPreviewUrl('')
+    setImageUploadFile(null)
+    setImageUploadError('')
+  }
+
+  const handleImageModeChange = (mode) => {
+    if (mode === imageInputMode) return
+    setImageInputMode(mode)
+    if (mode === 'url') {
+      clearImageUploadSelection()
+      return
+    }
+    updateField('heroImageUrl', '')
+  }
+
+  const handleImageFileChange = (file) => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    if (!file) {
+      setImageUploadPreviewUrl('')
+      setImageUploadFile(null)
+      setImageUploadError('')
+      return
+    }
+    setImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setImageUploadFile(file)
+    setImageUploadError('')
+  }
+
   const submit = async (event) => {
     event.preventDefault()
-    const quickValid = validateMany(
-      validationSchema.map((field) => ({
-        name: field.name,
-        validate: () => validateSchemaField(validationSchema, form, field.name),
-      })),
-    )
-    const validation = validateSchema(validationSchema, form)
-    if (!quickValid || !validation.valid) {
+    const validationForm = {
+      ...form,
+      heroImageUrl:
+        imageInputMode === 'upload' && imageUploadFile && !form.heroImageUrl
+          ? 'https://upload.pending.local/use-case-image.webp'
+          : form.heroImageUrl,
+    }
+    const validation = validateSchema(validationSchema, validationForm)
+    if (!validation.valid) {
       setStatus('error')
       setErrorMessage('Please fix the validation errors before saving.')
       setValidationErrors(validation.errors)
+      return
+    }
+    if (imageInputMode === 'upload' && !imageUploadFile) {
+      setImageUploadError('Please choose an image file before saving.')
+      setStatus('error')
       return
     }
 
@@ -269,8 +318,18 @@ const UseCaseEditorPage = ({ mode }) => {
     setValidationErrors([])
 
     try {
+      let resolvedHeroImageUrl = String(form.heroImageUrl ?? '').trim()
+      if (imageInputMode === 'upload' && imageUploadFile) {
+        const uploadResponse = await uploadBackstageImage({
+          file: imageUploadFile,
+          category: 'use-cases',
+          updatedBy: editorId,
+        })
+        resolvedHeroImageUrl = String(uploadResponse?.data?.url ?? '').trim()
+      }
       const payload = {
         ...form,
+        heroImageUrl: resolvedHeroImageUrl,
         updatedBy: editorId,
       }
 
@@ -390,26 +449,28 @@ const UseCaseEditorPage = ({ mode }) => {
               />
             </FormField>
 
-            <FormField
+            <ImageSourceInputField
               label="Background Image URL"
               required
               className="md:col-span-2"
-              error={getFieldError('heroImageUrl')}
-            >
-              <input
-                value={form.heroImageUrl}
-                onChange={(event) => updateField('heroImageUrl', event.target.value)}
-                onBlur={() => {
-                  syncBackgroundPreviewAfterBlur()
-                  validateByFieldName('heroImageUrl')
-                }}
-                className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-              />
-            </FormField>
+              mode={imageInputMode}
+              onModeChange={handleImageModeChange}
+              urlValue={form.heroImageUrl}
+              onUrlChange={(nextValue) => updateField('heroImageUrl', nextValue)}
+              onUrlBlur={() => {
+                syncBackgroundPreviewAfterBlur()
+                validateByFieldName('heroImageUrl')
+              }}
+              urlError={getFieldError('heroImageUrl')}
+              uploadFile={imageUploadFile}
+              onUploadFileChange={handleImageFileChange}
+              onClearUploadFile={clearImageUploadSelection}
+              uploadError={imageUploadError}
+            />
 
             <div className="space-y-1 text-sm md:col-span-2">
               <p className="font-medium text-slate-700">Background Preview</p>
-              {!backgroundPreviewUrl ? (
+              {!(imageInputMode === 'upload' && imageUploadPreviewUrl) && !backgroundPreviewUrl ? (
                 <div className="flex h-32 w-full max-w-[380px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
                   No image URL
                 </div>
@@ -422,7 +483,11 @@ const UseCaseEditorPage = ({ mode }) => {
                   ) : null}
                   <img
                     ref={previewImgRef}
-                    src={backgroundPreviewUrl}
+                    src={
+                      imageInputMode === 'upload' && imageUploadPreviewUrl
+                        ? imageUploadPreviewUrl
+                        : backgroundPreviewUrl
+                    }
                     alt="Use case background preview"
                     className={`h-full w-full object-cover ${backgroundPreviewState === 'error' ? 'hidden' : ''}`}
                     onLoad={() => setBackgroundPreviewState('loaded')}

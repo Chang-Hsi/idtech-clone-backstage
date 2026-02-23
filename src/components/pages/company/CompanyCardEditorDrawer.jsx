@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import DropdownSelect from '../../common/DropdownSelect'
 import FormField from '../../common/FormField'
 import StatusMessage from '../../common/StatusMessage'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import useFormValidation from '../../../hooks/useFormValidation'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
 import { buildCompanyCardEditorSchema } from './CompanyCardEditorDrawer.schema'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 
 const CLOSE_ANIMATION_MS = 220
 
@@ -26,19 +28,58 @@ const CompanyCardEditorDrawer = ({ isOpen, mode, card, onClose, onSave, isSaving
   const [isClosing, setIsClosing] = useState(false)
   const [previewUrl, setPreviewUrl] = useState(initialDraft.imageUrl)
   const [previewState, setPreviewState] = useState(initialDraft.imageUrl ? 'loading' : 'idle')
+  const [imageInputMode, setImageInputMode] = useState('url')
+  const [imageUploadFile, setImageUploadFile] = useState(null)
+  const [imageUploadError, setImageUploadError] = useState('')
+  const [imageUploadPreviewUrl, setImageUploadPreviewUrl] = useState('')
   const previewBlurTimerRef = useRef(null)
   const validationSchema = useMemo(() => buildCompanyCardEditorSchema(), [])
 
   useEffect(() => {
     return () => {
       if (previewBlurTimerRef.current) clearTimeout(previewBlurTimerRef.current)
+      if (imageUploadPreviewUrl) window.URL.revokeObjectURL(imageUploadPreviewUrl)
     }
-  }, [])
+  }, [imageUploadPreviewUrl])
 
   if (!isOpen) return null
 
   const update = (field, value) => {
     setDraft((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const clearImageUploadSelection = () => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    setImageUploadFile(null)
+    setImageUploadPreviewUrl('')
+    setImageUploadError('')
+  }
+
+  const handleImageModeChange = (mode) => {
+    if (mode === imageInputMode) return
+    setImageInputMode(mode)
+    if (mode === 'url') {
+      clearImageUploadSelection()
+      return
+    }
+    update('imageUrl', '')
+  }
+
+  const handleImageUploadFileChange = (file) => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    if (!file) {
+      setImageUploadFile(null)
+      setImageUploadPreviewUrl('')
+      setImageUploadError('')
+      return
+    }
+    setImageUploadFile(file)
+    setImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setImageUploadError('')
   }
 
   const syncPreviewAfterBlur = () => {
@@ -62,28 +103,52 @@ const CompanyCardEditorDrawer = ({ isOpen, mode, card, onClose, onSave, isSaving
     window.setTimeout(() => onClose(), CLOSE_ANIMATION_MS)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const validationDraft = {
+      ...draft,
+      imageUrl:
+        imageInputMode === 'upload'
+          ? imageUploadFile
+            ? 'https://placeholder.local/upload.webp'
+            : ''
+          : draft.imageUrl,
+    }
     const quickValid = validateMany(
       validationSchema.map((field) => ({
         name: field.name,
-        validate: () => validateSchemaField(validationSchema, draft, field.name),
+        validate: () => validateSchemaField(validationSchema, validationDraft, field.name),
       })),
     )
-    const validation = validateSchema(validationSchema, draft)
+    const validation = validateSchema(validationSchema, validationDraft)
     if (!quickValid || !validation.valid) {
       setErrorMessage('Please fix validation errors before saving.')
       setValidationErrors(validation.errors)
       return
     }
 
+    let resolvedImageUrl = String(validationDraft.imageUrl ?? '').trim()
+    if (imageInputMode === 'upload' && imageUploadFile) {
+      try {
+        const uploaded = await uploadBackstageImage(imageUploadFile)
+        const uploadedUrl = String(uploaded?.data?.url ?? '').trim()
+        if (!uploadedUrl) throw new Error('Image upload succeeded but no URL was returned.')
+        resolvedImageUrl = uploadedUrl
+        setImageUploadError('')
+      } catch (error) {
+        setErrorMessage(error.message || 'Unable to upload image.')
+        setImageUploadError(error.message || 'Unable to upload image.')
+        return
+      }
+    }
+
     setErrorMessage('')
     setValidationErrors([])
     onSave({
-      ...draft,
-      title: draft.title.trim(),
-      description: draft.description.trim(),
-      to: draft.to.trim(),
-      imageUrl: draft.imageUrl.trim(),
+      ...validationDraft,
+      title: validationDraft.title.trim(),
+      description: validationDraft.description.trim(),
+      to: validationDraft.to.trim(),
+      imageUrl: resolvedImageUrl,
     })
   }
 
@@ -156,21 +221,31 @@ const CompanyCardEditorDrawer = ({ isOpen, mode, card, onClose, onSave, isSaving
               />
             </FormField>
 
-            <FormField label="Image URL" required error={getFieldError('imageUrl')}>
-              <input
-                value={draft.imageUrl}
-                onChange={(event) => update('imageUrl', event.target.value)}
-                onBlur={() => {
-                  syncPreviewAfterBlur()
-                  validateField('imageUrl', () => validateSchemaField(validationSchema, draft, 'imageUrl'))
-                }}
-                className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-              />
-            </FormField>
+            <ImageSourceInputField
+              label="Image URL"
+              mode={imageInputMode}
+              onModeChange={handleImageModeChange}
+              urlValue={draft.imageUrl}
+              onUrlChange={(value) => update('imageUrl', value)}
+              onUrlBlur={() => {
+                syncPreviewAfterBlur()
+                validateField('imageUrl', () => validateSchemaField(validationSchema, draft, 'imageUrl'))
+              }}
+              urlError={getFieldError('imageUrl')}
+              uploadFile={imageUploadFile}
+              onUploadFileChange={handleImageUploadFileChange}
+              onClearUploadFile={clearImageUploadSelection}
+              uploadError={imageUploadError}
+              required
+            />
 
             <div className="space-y-1 text-sm">
               <p className="font-medium text-slate-700">Image Preview</p>
-              {!previewUrl ? (
+              {imageInputMode === 'upload' && imageUploadPreviewUrl ? (
+                <div className="relative h-28 w-28 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                  <img src={imageUploadPreviewUrl} alt="Company card upload preview" className="h-full w-full object-cover" />
+                </div>
+              ) : !previewUrl ? (
                 <div className="flex h-28 w-28 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
                   No image URL
                 </div>

@@ -8,12 +8,14 @@ import FormField from '../../common/FormField'
 import DropdownSelect from '../../common/DropdownSelect'
 import DatePickerField from '../../common/DatePickerField'
 import StatusMessage from '../../common/StatusMessage'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import useFormValidation from '../../../hooks/useFormValidation'
 import {
   createBackstageResource,
   fetchBackstageResourceBySlug,
   updateBackstageResource,
 } from '../../../api/backstageContentResourcesApi'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
 import { buildResourceEditorValidationSchema } from './ResourceEditorPage.schema'
 
@@ -30,7 +32,7 @@ const ResourceEditorPage = ({ mode }) => {
   const navigate = useNavigate()
   const { slug } = useParams()
   const { user } = useAuth()
-  const { clearAll, getFieldError, validateField, validateMany } = useFormValidation()
+  const { clearAll, getFieldError, validateField } = useFormValidation()
   const editorId = useMemo(() => user?.email ?? user?.name ?? 'unknown-editor', [user])
 
   const [status, setStatus] = useState('idle')
@@ -43,6 +45,10 @@ const ResourceEditorPage = ({ mode }) => {
   const [previewState, setPreviewState] = useState('idle')
   const previewBlurTimerRef = useRef(null)
   const previewImgRef = useRef(null)
+  const [imageInputMode, setImageInputMode] = useState('url')
+  const [imageUploadFile, setImageUploadFile] = useState(null)
+  const [imageUploadError, setImageUploadError] = useState('')
+  const [imageUploadPreviewUrl, setImageUploadPreviewUrl] = useState('')
   const validationSchema = useMemo(() => buildResourceEditorValidationSchema(form), [form])
 
   const validateByFieldName = (fieldName) =>
@@ -89,8 +95,11 @@ const ResourceEditorPage = ({ mode }) => {
   useEffect(() => {
     return () => {
       if (previewBlurTimerRef.current) clearTimeout(previewBlurTimerRef.current)
+      if (imageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(imageUploadPreviewUrl)
+      }
     }
-  }, [])
+  }, [imageUploadPreviewUrl])
 
   useEffect(() => {
     if (!previewUrl) {
@@ -161,19 +170,59 @@ const ResourceEditorPage = ({ mode }) => {
     }, 500)
   }
 
+  const clearImageUploadSelection = () => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    setImageUploadPreviewUrl('')
+    setImageUploadFile(null)
+    setImageUploadError('')
+  }
+
+  const handleImageModeChange = (mode) => {
+    if (mode === imageInputMode) return
+    setImageInputMode(mode)
+    if (mode === 'url') {
+      clearImageUploadSelection()
+      return
+    }
+    updateField('coverImageUrl', '')
+  }
+
+  const handleImageFileChange = (file) => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    if (!file) {
+      setImageUploadPreviewUrl('')
+      setImageUploadFile(null)
+      setImageUploadError('')
+      return
+    }
+    setImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setImageUploadFile(file)
+    setImageUploadError('')
+  }
+
   const submit = async (event) => {
     event.preventDefault()
-    const quickValid = validateMany(
-      validationSchema.map((field) => ({
-        name: field.name,
-        validate: () => validateSchemaField(validationSchema, form, field.name),
-      })),
-    )
-    const validation = validateSchema(validationSchema, form)
-    if (!quickValid || !validation.valid) {
+    const validationForm = {
+      ...form,
+      coverImageUrl:
+        imageInputMode === 'upload' && imageUploadFile && !form.coverImageUrl
+          ? 'https://upload.pending.local/resource-cover.webp'
+          : form.coverImageUrl,
+    }
+    const validation = validateSchema(validationSchema, validationForm)
+    if (!validation.valid) {
       setStatus('error')
       setErrorMessage('Please fix the validation errors before saving.')
       setValidationErrors(validation.errors)
+      return
+    }
+    if (imageInputMode === 'upload' && !imageUploadFile) {
+      setImageUploadError('Please choose an image file before saving.')
+      setStatus('error')
       return
     }
 
@@ -182,7 +231,16 @@ const ResourceEditorPage = ({ mode }) => {
     setValidationErrors([])
 
     try {
-      const payload = { ...form, updatedBy: editorId }
+      let resolvedCoverImageUrl = String(form.coverImageUrl ?? '').trim()
+      if (imageInputMode === 'upload' && imageUploadFile) {
+        const uploadResponse = await uploadBackstageImage({
+          file: imageUploadFile,
+          category: 'resources',
+          updatedBy: editorId,
+        })
+        resolvedCoverImageUrl = String(uploadResponse?.data?.url ?? '').trim()
+      }
+      const payload = { ...form, coverImageUrl: resolvedCoverImageUrl, updatedBy: editorId }
       if (mode === 'create') {
         await createBackstageResource(payload)
       } else {
@@ -247,26 +305,28 @@ const ResourceEditorPage = ({ mode }) => {
               />
             </FormField>
 
-            <FormField
+            <ImageSourceInputField
               label="Cover Image URL"
               required
               className="md:col-span-2"
-              error={getFieldError('coverImageUrl')}
-            >
-              <input
-                value={form.coverImageUrl}
-                onChange={(event) => updateField('coverImageUrl', event.target.value)}
-                onBlur={() => {
-                  syncPreviewAfterBlur()
-                  validateByFieldName('coverImageUrl')
-                }}
-                className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-              />
-            </FormField>
+              mode={imageInputMode}
+              onModeChange={handleImageModeChange}
+              urlValue={form.coverImageUrl}
+              onUrlChange={(nextValue) => updateField('coverImageUrl', nextValue)}
+              onUrlBlur={() => {
+                syncPreviewAfterBlur()
+                validateByFieldName('coverImageUrl')
+              }}
+              urlError={getFieldError('coverImageUrl')}
+              uploadFile={imageUploadFile}
+              onUploadFileChange={handleImageFileChange}
+              onClearUploadFile={clearImageUploadSelection}
+              uploadError={imageUploadError}
+            />
 
             <div className="space-y-1 md:col-span-2">
               <p className="text-sm font-medium text-slate-700">Background Preview</p>
-              {!previewUrl ? (
+              {!(imageInputMode === 'upload' && imageUploadPreviewUrl) && !previewUrl ? (
                 <div className="flex h-36 w-36 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
                   No image URL
                 </div>
@@ -279,7 +339,7 @@ const ResourceEditorPage = ({ mode }) => {
                   ) : null}
                   <img
                     ref={previewImgRef}
-                    src={previewUrl}
+                    src={imageInputMode === 'upload' && imageUploadPreviewUrl ? imageUploadPreviewUrl : previewUrl}
                     alt="Resource preview"
                     className={`h-full w-full object-cover ${previewState === 'error' ? 'hidden' : ''}`}
                     onLoad={() => setPreviewState('loaded')}

@@ -58,12 +58,19 @@ export function setUnauthorizedHandler(handler) {
 }
 
 export async function request(path, options = {}) {
+  const isFormDataPayload =
+    typeof FormData !== 'undefined' &&
+    options?.body instanceof FormData
+  const mergedHeaders = {
+    ...(options.headers ?? {}),
+  }
+  if (!isFormDataPayload && !('Content-Type' in mergedHeaders) && !('content-type' in mergedHeaders)) {
+    mergedHeaders['Content-Type'] = 'application/json'
+  }
+
   const response = await fetch(toAbsoluteUrl(path), {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
+    headers: mergedHeaders,
     ...options,
   })
 

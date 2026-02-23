@@ -326,3 +326,78 @@ Goal: move high-risk write payload validation to a single contract source shared
 - 以「可追蹤」優先：同時提供 summary、trend、raw records。
 - 卡片與圖表使用同一批 API 資料，避免數字不一致。
 - 保留 run 連結，方便追到 GitHub Actions 原始執行紀錄。
+
+## Backstage 圖片上傳策略（已落地，保留 URL 路線）
+
+### 目標
+
+- 在不破壞既有 URL 輸入流程下，新增後台「從本機上傳圖片」能力。
+- 與後端 Cloudinary + Sharp 流程對齊，最終仍以 URL 存入既有欄位。
+
+### 共用化策略（本次新增）
+
+- 共用上傳 API：`src/api/backstageUploadsApi.js`
+  - `uploadBackstageImage(...)` 統一呼叫 `POST /api/backstage/uploads/images`
+  - 支援 `file + category + updatedBy`
+- 共用圖片欄位元件：`src/components/common/ImageSourceInputField.jsx`
+  - 內建 `Image URL / Upload Image` tabbar
+  - 輸入模式互斥，統一欄位樣式與互動
+- 請求層補強：`src/lib/request.js`
+  - 支援 `FormData`，上傳時不強制 `application/json`
+
+### UI 策略（各圖片欄位頁面）
+
+- 頭像欄位改為 Tabbar 雙模式：
+  - `Avatar URL`
+  - `Upload Image`
+- **互斥顯示**（不是 disabled）：
+  - 在 `Avatar URL` 模式：只渲染 URL 表單。
+  - 在 `Upload Image` 模式：只渲染檔案選擇與提示表單。
+- 切換模式時清理另一模式的暫存，避免同時存在兩份來源資料。
+
+### 路線保留策略（重點）
+
+- **URL 路線保留原本做法**：
+  - `Save` 直接呼叫既有各頁 save API
+  - 不經過上傳 API
+- **Upload 路線新增兩段式流程**：
+  1. 先呼叫 `POST /api/backstage/uploads/images`（multipart/form-data）
+  2. 取回 `url` 後，再呼叫原本 save API
+
+### 為什麼採「先預覽，Save 才上傳」
+
+- 使用者在 `Upload Image` 模式選檔後，先做前端 Preview。
+- 直到按下 `Save Profile` 才真的送上傳 API，避免：
+  - 只是試看就產生雲端髒檔
+  - 與原本 save 動作時機不一致
+- 這也避免把大檔案 form-data 強行與 profile JSON 存檔請求混在同一支 API。
+
+### 與後端對應
+
+- 後端端點：`POST /api/backstage/uploads/images`
+- 後端處理：驗證檔案 -> Sharp 轉 WebP -> 上傳 Cloudinary -> 回傳 URL
+- 前端只消費回傳 URL，最後仍寫入原本 `avatarUrl` 欄位。
+
+### 已套用頁面（新增 / 編輯圖片）
+
+- `SettingsProfileSection.jsx`
+- `ProductEditorPage.jsx`
+- `CollectionEditorPage.jsx`
+- `UseCaseEditorPage.jsx`
+- `ResourceEditorPage.jsx`
+- `ContactPageEditor.jsx`
+- `SeoManagerPage.jsx`
+- `CareersJobEditorPage.jsx`
+- `CompanyCardEditorDrawer.jsx`
+- `AboutUsPageEditor.jsx`（intro + highlights）
+- `BannerHubRowEditorDrawer.jsx`
+- `HomeHeroEditorDrawer.jsx`（background + foreground）
+
+### 相關檔案
+
+- `src/components/pages/settings/sections/SettingsProfileSection.jsx`
+- `src/components/pages/settings/SettingsManagerPage.jsx`
+- `src/api/backstageSettingsApi.js`
+- `src/api/backstageUploadsApi.js`
+- `src/components/common/ImageSourceInputField.jsx`
+- `src/lib/request.js`（支援 FormData，不強制 JSON Content-Type）

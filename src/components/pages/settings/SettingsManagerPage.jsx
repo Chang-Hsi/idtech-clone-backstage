@@ -15,6 +15,7 @@ import {
   fetchBackstageSettings,
   fetchBackstageSettingsAuditLogs,
   resetBackstageEmployeePassword,
+  uploadBackstageSettingsImage,
   updateBackstageSettingsEmployees,
   updateBackstageSettingsPassword,
   updateBackstageSettingsProfile,
@@ -203,6 +204,10 @@ const SettingsManagerPage = () => {
   const [copiedCredentialKey, setCopiedCredentialKey] = useState('')
   const [avatarLoadError, setAvatarLoadError] = useState(false)
   const [avatarUrlError, setAvatarUrlError] = useState('')
+  const [avatarUploadError, setAvatarUploadError] = useState('')
+  const [avatarInputMode, setAvatarInputMode] = useState('url')
+  const [avatarUploadFile, setAvatarUploadFile] = useState(null)
+  const [avatarUploadPreviewUrl, setAvatarUploadPreviewUrl] = useState('')
   const [updatedAt, setUpdatedAt] = useState('')
   const [updatedBy, setUpdatedBy] = useState('')
   const [selectedRoleId, setSelectedRoleId] = useState('')
@@ -317,7 +322,18 @@ const SettingsManagerPage = () => {
       ),
     [normalizedProfileActivityOffset, profileActivities],
   )
-  const profileAvatarUrl = String(settings.profile?.avatarUrl ?? '').trim()
+  const profileAvatarUrl =
+    avatarInputMode === 'upload' && avatarUploadPreviewUrl
+      ? avatarUploadPreviewUrl
+      : String(settings.profile?.avatarUrl ?? '').trim()
+
+  useEffect(() => {
+    return () => {
+      if (avatarUploadPreviewUrl) {
+        window.URL.revokeObjectURL(avatarUploadPreviewUrl)
+      }
+    }
+  }, [avatarUploadPreviewUrl])
 
   const load = async ({ startLoading = true } = {}) => {
     if (!isMountedRef.current) return
@@ -409,10 +425,57 @@ const SettingsManagerPage = () => {
     }
   }, [])
 
+  const handleAvatarInputModeChange = (mode) => {
+    if (mode === avatarInputMode) return
+    setAvatarInputMode(mode)
+    setAvatarLoadError(false)
+    if (mode === 'url') {
+      if (avatarUploadPreviewUrl) {
+        window.URL.revokeObjectURL(avatarUploadPreviewUrl)
+      }
+      setAvatarUploadPreviewUrl('')
+      setAvatarUploadFile(null)
+      setAvatarUploadError('')
+      return
+    }
+    setAvatarUrlError('')
+    setSettings((prev) => ({ ...prev, profile: { ...prev.profile, avatarUrl: '' } }))
+  }
+
+  const handleAvatarUploadFileChange = (file) => {
+    if (avatarUploadPreviewUrl) {
+      window.URL.revokeObjectURL(avatarUploadPreviewUrl)
+    }
+    if (!file) {
+      setAvatarUploadFile(null)
+      setAvatarUploadPreviewUrl('')
+      setAvatarUploadError('')
+      return
+    }
+    const nextPreviewUrl = window.URL.createObjectURL(file)
+    setAvatarUploadFile(file)
+    setAvatarUploadPreviewUrl(nextPreviewUrl)
+    setAvatarUploadError('')
+    setAvatarLoadError(false)
+  }
+
+  const clearAvatarUploadSelection = () => {
+    if (avatarUploadPreviewUrl) {
+      window.URL.revokeObjectURL(avatarUploadPreviewUrl)
+    }
+    setAvatarUploadPreviewUrl('')
+    setAvatarUploadFile(null)
+    setAvatarUploadError('')
+  }
+
   const saveProfile = async () => {
     const avatarValue = String(settings.profile.avatarUrl ?? '').trim()
-    if (!isValidHttpUrl(avatarValue)) {
+    if (avatarInputMode === 'url' && !isValidHttpUrl(avatarValue)) {
       setAvatarUrlError('Avatar URL must start with http:// or https://')
+      return
+    }
+    if (avatarInputMode === 'upload' && !avatarUploadFile) {
+      setAvatarUploadError('Please choose an image file before saving profile.')
       return
     }
 
@@ -420,17 +483,36 @@ const SettingsManagerPage = () => {
     setErrorMessage('')
     setSuccessMessage('')
     try {
+      let resolvedAvatarUrl = avatarValue
+      if (avatarInputMode === 'upload' && avatarUploadFile) {
+        const uploadResponse = await uploadBackstageSettingsImage({
+          file: avatarUploadFile,
+          category: 'profile',
+          updatedBy: editorId,
+        })
+        resolvedAvatarUrl = String(uploadResponse?.data?.url ?? '').trim()
+        if (!resolvedAvatarUrl) {
+          throw new Error('Image upload did not return a valid URL.')
+        }
+      }
       await updateBackstageSettingsProfile({
         displayName: settings.profile.displayName,
-        avatarUrl: avatarValue,
+        avatarUrl: resolvedAvatarUrl,
         updatedBy: editorId,
       })
       await load()
       if (!isMountedRef.current) return
+      if (avatarInputMode === 'upload') {
+        clearAvatarUploadSelection()
+        setAvatarInputMode('url')
+      }
       setSuccessMessage('Profile settings saved.')
       setStatus('success')
     } catch (error) {
       if (!isMountedRef.current) return
+      if (avatarInputMode === 'upload') {
+        setAvatarUploadError(error?.message || 'Unable to upload avatar image.')
+      }
       setErrorMessage(error?.message || 'Unable to save profile settings.')
       setStatus('error')
     }
@@ -951,6 +1033,12 @@ const SettingsManagerPage = () => {
           setSettings={setSettings}
           avatarUrlError={avatarUrlError}
           setAvatarUrlError={setAvatarUrlError}
+          avatarUploadError={avatarUploadError}
+          avatarInputMode={avatarInputMode}
+          setAvatarInputMode={handleAvatarInputModeChange}
+          avatarUploadFile={avatarUploadFile}
+          handleAvatarUploadFileChange={handleAvatarUploadFileChange}
+          clearAvatarUploadSelection={clearAvatarUploadSelection}
           isValidHttpUrl={isValidHttpUrl}
           passwordCardRef={passwordCardRef}
           changePassword={changePassword}

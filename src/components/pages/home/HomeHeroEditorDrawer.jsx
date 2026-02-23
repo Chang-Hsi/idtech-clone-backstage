@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import useFormValidation from '../../../hooks/useFormValidation'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
 import { buildHomeHeroDrawerSchema } from './HomeHeroEditorDrawer.schema'
@@ -157,10 +159,29 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
   const [draft, setDraft] = useState(() => initialSlide)
   const [layoutPreset, setLayoutPreset] = useState(() => inferPresetFromLayers(initialSlide?.layers))
   const [foregroundImageUrl, setForegroundImageUrl] = useState(() => findForegroundImage(initialSlide?.layers))
+  const [backgroundImageInputMode, setBackgroundImageInputMode] = useState('url')
+  const [backgroundImageUploadFile, setBackgroundImageUploadFile] = useState(null)
+  const [backgroundImageUploadError, setBackgroundImageUploadError] = useState('')
+  const [backgroundImageUploadPreviewUrl, setBackgroundImageUploadPreviewUrl] = useState('')
+  const [foregroundImageInputMode, setForegroundImageInputMode] = useState('url')
+  const [foregroundImageUploadFile, setForegroundImageUploadFile] = useState(null)
+  const [foregroundImageUploadError, setForegroundImageUploadError] = useState('')
+  const [foregroundImageUploadPreviewUrl, setForegroundImageUploadPreviewUrl] = useState('')
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState([])
   const [isClosing, setIsClosing] = useState(false)
   const validationSchema = buildHomeHeroDrawerSchema({ layoutPreset })
+
+  useEffect(() => {
+    return () => {
+      if (backgroundImageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(backgroundImageUploadPreviewUrl)
+      }
+      if (foregroundImageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(foregroundImageUploadPreviewUrl)
+      }
+    }
+  }, [backgroundImageUploadPreviewUrl, foregroundImageUploadPreviewUrl])
 
   if (!isOpen || !draft) return null
 
@@ -182,8 +203,98 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
     })
   }
 
-  const handleApply = () => {
-    const fullDraft = { ...draft, foregroundImageUrl }
+  const clearBackgroundUploadSelection = () => {
+    if (backgroundImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(backgroundImageUploadPreviewUrl)
+    }
+    setBackgroundImageUploadFile(null)
+    setBackgroundImageUploadPreviewUrl('')
+    setBackgroundImageUploadError('')
+  }
+
+  const clearForegroundUploadSelection = () => {
+    if (foregroundImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(foregroundImageUploadPreviewUrl)
+    }
+    setForegroundImageUploadFile(null)
+    setForegroundImageUploadPreviewUrl('')
+    setForegroundImageUploadError('')
+  }
+
+  const handleBackgroundImageModeChange = (mode) => {
+    if (mode === backgroundImageInputMode) return
+    setBackgroundImageInputMode(mode)
+    if (mode === 'url') {
+      clearBackgroundUploadSelection()
+      return
+    }
+    update('background.imageUrl', '')
+  }
+
+  const handleForegroundImageModeChange = (mode) => {
+    if (mode === foregroundImageInputMode) return
+    setForegroundImageInputMode(mode)
+    if (mode === 'url') {
+      clearForegroundUploadSelection()
+      return
+    }
+    setForegroundImageUrl('')
+  }
+
+  const handleBackgroundImageUploadFileChange = (file) => {
+    if (backgroundImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(backgroundImageUploadPreviewUrl)
+    }
+    if (!file) {
+      setBackgroundImageUploadFile(null)
+      setBackgroundImageUploadPreviewUrl('')
+      setBackgroundImageUploadError('')
+      return
+    }
+    setBackgroundImageUploadFile(file)
+    setBackgroundImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setBackgroundImageUploadError('')
+  }
+
+  const handleForegroundImageUploadFileChange = (file) => {
+    if (foregroundImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(foregroundImageUploadPreviewUrl)
+    }
+    if (!file) {
+      setForegroundImageUploadFile(null)
+      setForegroundImageUploadPreviewUrl('')
+      setForegroundImageUploadError('')
+      return
+    }
+    setForegroundImageUploadFile(file)
+    setForegroundImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setForegroundImageUploadError('')
+  }
+
+  const handleApply = async () => {
+    const validationDraft = {
+      ...draft,
+      background: {
+        ...draft.background,
+        imageUrl:
+          backgroundImageInputMode === 'upload'
+            ? backgroundImageUploadFile
+              ? 'https://placeholder.local/upload.webp'
+              : ''
+            : draft.background.imageUrl,
+      },
+    }
+    const fullDraft = {
+      ...validationDraft,
+      foregroundImageUrl:
+        layoutPreset === 'split'
+          ? foregroundImageInputMode === 'upload'
+            ? foregroundImageUploadFile
+              ? 'https://placeholder.local/upload.webp'
+              : ''
+            : foregroundImageUrl
+          : '',
+    }
     const quickValid = validateMany(
       validationSchema.map((field) => ({
         name: field.name,
@@ -197,6 +308,36 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
       return
     }
 
+    let resolvedBackgroundImageUrl = String(fullDraft.background.imageUrl ?? '').trim()
+    if (backgroundImageInputMode === 'upload' && backgroundImageUploadFile) {
+      try {
+        const uploaded = await uploadBackstageImage(backgroundImageUploadFile)
+        const uploadedUrl = String(uploaded?.data?.url ?? '').trim()
+        if (!uploadedUrl) throw new Error('Image upload succeeded but no URL was returned.')
+        resolvedBackgroundImageUrl = uploadedUrl
+        setBackgroundImageUploadError('')
+      } catch (uploadError) {
+        setError(uploadError.message || 'Unable to upload background image.')
+        setBackgroundImageUploadError(uploadError.message || 'Unable to upload background image.')
+        return
+      }
+    }
+
+    let resolvedForegroundImageUrl = String(fullDraft.foregroundImageUrl ?? '').trim()
+    if (layoutPreset === 'split' && foregroundImageInputMode === 'upload' && foregroundImageUploadFile) {
+      try {
+        const uploaded = await uploadBackstageImage(foregroundImageUploadFile)
+        const uploadedUrl = String(uploaded?.data?.url ?? '').trim()
+        if (!uploadedUrl) throw new Error('Image upload succeeded but no URL was returned.')
+        resolvedForegroundImageUrl = uploadedUrl
+        setForegroundImageUploadError('')
+      } catch (uploadError) {
+        setError(uploadError.message || 'Unable to upload foreground image.')
+        setForegroundImageUploadError(uploadError.message || 'Unable to upload foreground image.')
+        return
+      }
+    }
+
     const normalizedOpacity = Number(draft.background.overlayOpacity)
     const generatedLayers = buildLayersByPreset({
       slideId: draft.id,
@@ -205,13 +346,14 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
       desc: draft.desc,
       ctaLabel: draft.primaryCta.label,
       ctaTo: draft.primaryCta.to,
-      foregroundImageUrl: foregroundImageUrl.trim(),
+      foregroundImageUrl: resolvedForegroundImageUrl,
     })
 
     onApply({
-      ...draft,
+      ...validationDraft,
       background: {
-        ...draft.background,
+        ...validationDraft.background,
+        imageUrl: resolvedBackgroundImageUrl,
         overlayOpacity: normalizedOpacity,
       },
       layers: generatedLayers,
@@ -339,36 +481,64 @@ const HomeHeroEditorDrawer = ({ isOpen, initialSlide, mode, onClose, onApply }) 
             </label>
           </div>
 
-          <label className="block space-y-1 text-sm">
-            <span className="font-medium text-slate-700">
-              Background Image URL<span className="ml-1 text-red-500">*</span>
-            </span>
-            <input
-              value={draft.background.imageUrl}
-              onChange={(event) => update('background.imageUrl', event.target.value)}
-              onBlur={() => validateField('background.imageUrl', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'background.imageUrl'))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
-            />
-            {getFieldError('background.imageUrl') ? (
-              <p className="text-xs text-red-600">{getFieldError('background.imageUrl')}</p>
-            ) : null}
-          </label>
+          <ImageSourceInputField
+            label="Background Image URL"
+            mode={backgroundImageInputMode}
+            onModeChange={handleBackgroundImageModeChange}
+            urlValue={draft.background.imageUrl}
+            onUrlChange={(value) => update('background.imageUrl', value)}
+            onUrlBlur={() =>
+              validateField('background.imageUrl', () =>
+                validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'background.imageUrl')
+              )
+            }
+            urlError={getFieldError('background.imageUrl')}
+            uploadFile={backgroundImageUploadFile}
+            onUploadFileChange={handleBackgroundImageUploadFileChange}
+            onClearUploadFile={clearBackgroundUploadSelection}
+            uploadError={backgroundImageUploadError}
+            required
+          />
+
+          {backgroundImageInputMode === 'upload' && backgroundImageUploadPreviewUrl ? (
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-slate-700">Background Upload Preview</p>
+              <div className="relative overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                <img src={backgroundImageUploadPreviewUrl} alt="Background upload preview" className="h-36 w-full object-cover" />
+              </div>
+            </div>
+          ) : null}
 
           {layoutPreset === 'split' ? (
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">
-                Foreground Image URL<span className="ml-1 text-red-500">*</span>
-              </span>
-              <input
-                value={foregroundImageUrl}
-                onChange={(event) => setForegroundImageUrl(event.target.value)}
-                onBlur={() => validateField('foregroundImageUrl', () => validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'foregroundImageUrl'))}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+            <>
+              <ImageSourceInputField
+                label="Foreground Image URL"
+                mode={foregroundImageInputMode}
+                onModeChange={handleForegroundImageModeChange}
+                urlValue={foregroundImageUrl}
+                onUrlChange={(value) => setForegroundImageUrl(value)}
+                onUrlBlur={() =>
+                  validateField('foregroundImageUrl', () =>
+                    validateSchemaField(validationSchema, { ...draft, foregroundImageUrl }, 'foregroundImageUrl')
+                  )
+                }
+                urlError={getFieldError('foregroundImageUrl')}
+                uploadFile={foregroundImageUploadFile}
+                onUploadFileChange={handleForegroundImageUploadFileChange}
+                onClearUploadFile={clearForegroundUploadSelection}
+                uploadError={foregroundImageUploadError}
+                required
               />
-              {getFieldError('foregroundImageUrl') ? (
-                <p className="text-xs text-red-600">{getFieldError('foregroundImageUrl')}</p>
+
+              {foregroundImageInputMode === 'upload' && foregroundImageUploadPreviewUrl ? (
+                <div className="space-y-1 text-sm">
+                  <p className="font-medium text-slate-700">Foreground Upload Preview</p>
+                  <div className="relative overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                    <img src={foregroundImageUploadPreviewUrl} alt="Foreground upload preview" className="h-36 w-full object-cover" />
+                  </div>
+                </div>
               ) : null}
-            </label>
+            </>
           ) : null}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

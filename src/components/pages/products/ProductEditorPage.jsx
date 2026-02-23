@@ -4,12 +4,14 @@ import { useAuth } from '../../../features/auth/AuthContext'
 import FormField from '../../common/FormField'
 import DropdownSelect from '../../common/DropdownSelect'
 import StatusMessage from '../../common/StatusMessage'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import useFormValidation from '../../../hooks/useFormValidation'
 import {
   createBackstageProduct,
   fetchBackstageProductBySlug,
   updateBackstageProduct,
 } from '../../../api/backstageContentProductsApi'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
 import { buildProductEditorValidationSchema } from './ProductEditorPage.schema'
 
@@ -26,7 +28,7 @@ const ProductEditorPage = ({ mode }) => {
   const navigate = useNavigate()
   const { slug } = useParams()
   const { user } = useAuth()
-  const { clearAll, getFieldError, validateField, validateMany } = useFormValidation()
+  const { clearAll, getFieldError, validateField } = useFormValidation()
   const editorId = useMemo(() => user?.email ?? user?.name ?? 'unknown-editor', [user])
 
   const [status, setStatus] = useState('idle')
@@ -39,6 +41,13 @@ const ProductEditorPage = ({ mode }) => {
   const [heroPreviewState, setHeroPreviewState] = useState('idle')
   const previewBlurTimerRef = useRef(null)
   const previewImgRef = useRef(null)
+  const [mediaImageInputMode, setMediaImageInputMode] = useState('url')
+  const [mediaImageUploadFile, setMediaImageUploadFile] = useState(null)
+  const [mediaImageUploadError, setMediaImageUploadError] = useState('')
+  const [mediaImageUploadPreviewUrl, setMediaImageUploadPreviewUrl] = useState('')
+  const [detailImageInputMode, setDetailImageInputMode] = useState('url')
+  const [detailImageUploadFile, setDetailImageUploadFile] = useState(null)
+  const [detailImageUploadError, setDetailImageUploadError] = useState('')
   const validationSchema = useMemo(() => buildProductEditorValidationSchema(form), [form])
 
   const validateByFieldName = (fieldName) =>
@@ -96,8 +105,11 @@ const ProductEditorPage = ({ mode }) => {
       if (previewBlurTimerRef.current) {
         clearTimeout(previewBlurTimerRef.current)
       }
+      if (mediaImageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(mediaImageUploadPreviewUrl)
+      }
     }
-  }, [])
+  }, [mediaImageUploadPreviewUrl])
 
   useEffect(() => {
     if (!heroPreviewUrl) {
@@ -162,6 +174,65 @@ const ProductEditorPage = ({ mode }) => {
     }))
   }
 
+  const clearMediaUploadSelection = () => {
+    if (mediaImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(mediaImageUploadPreviewUrl)
+    }
+    setMediaImageUploadFile(null)
+    setMediaImageUploadPreviewUrl('')
+    setMediaImageUploadError('')
+  }
+
+  const clearDetailUploadSelection = () => {
+    setDetailImageUploadFile(null)
+    setDetailImageUploadError('')
+  }
+
+  const handleMediaImageModeChange = (mode) => {
+    if (mode === mediaImageInputMode) return
+    setMediaImageInputMode(mode)
+    if (mode === 'url') {
+      clearMediaUploadSelection()
+      return
+    }
+    updateNestedField('media', 'heroImageUrl', '')
+  }
+
+  const handleDetailImageModeChange = (mode) => {
+    if (mode === detailImageInputMode) return
+    setDetailImageInputMode(mode)
+    if (mode === 'url') {
+      clearDetailUploadSelection()
+      return
+    }
+    updateNestedField('detail', 'heroImageUrl', '')
+  }
+
+  const handleMediaImageFileChange = (file) => {
+    if (mediaImageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(mediaImageUploadPreviewUrl)
+    }
+    if (!file) {
+      setMediaImageUploadFile(null)
+      setMediaImageUploadPreviewUrl('')
+      setMediaImageUploadError('')
+      return
+    }
+    setMediaImageUploadFile(file)
+    setMediaImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setMediaImageUploadError('')
+  }
+
+  const handleDetailImageFileChange = (file) => {
+    if (!file) {
+      setDetailImageUploadFile(null)
+      setDetailImageUploadError('')
+      return
+    }
+    setDetailImageUploadFile(file)
+    setDetailImageUploadError('')
+  }
+
   const syncHeroPreviewAfterBlur = () => {
     if (previewBlurTimerRef.current) {
       clearTimeout(previewBlurTimerRef.current)
@@ -185,18 +256,41 @@ const ProductEditorPage = ({ mode }) => {
 
   const submit = async (event) => {
     event.preventDefault()
-    const quickValid = validateMany(
-      validationSchema.map((field) => ({
-        name: field.name,
-        validate: () => validateSchemaField(validationSchema, form, field.name),
-      }))
-    )
-    const validation = validateSchema(validationSchema, form)
-    if (!quickValid || !validation.valid) {
+    const validationForm = {
+      ...form,
+      media: {
+        ...form.media,
+        heroImageUrl:
+          mediaImageInputMode === 'upload' && mediaImageUploadFile && !form.media.heroImageUrl
+            ? 'https://upload.pending.local/media-hero.webp'
+            : form.media.heroImageUrl,
+      },
+      detail: {
+        ...form.detail,
+        heroImageUrl:
+          detailImageInputMode === 'upload' && detailImageUploadFile && !form.detail.heroImageUrl
+            ? 'https://upload.pending.local/detail-hero.webp'
+            : form.detail.heroImageUrl,
+      },
+    }
+
+    const validation = validateSchema(validationSchema, validationForm)
+    if (!validation.valid) {
       setStatus('error')
       setErrorMessage('Please fix the validation errors before saving.')
       setValidationErrors(validation.errors)
       setSuccessMessage('')
+      return
+    }
+
+    if (mediaImageInputMode === 'upload' && !mediaImageUploadFile) {
+      setMediaImageUploadError('Please choose an image file before saving.')
+      setStatus('error')
+      return
+    }
+    if (detailImageInputMode === 'upload' && !detailImageUploadFile) {
+      setDetailImageUploadError('Please choose an image file before saving.')
+      setStatus('error')
       return
     }
 
@@ -206,8 +300,28 @@ const ProductEditorPage = ({ mode }) => {
     setSuccessMessage('')
 
     try {
+      let resolvedMediaHeroUrl = String(form.media.heroImageUrl ?? '').trim()
+      let resolvedDetailHeroUrl = String(form.detail.heroImageUrl ?? '').trim()
+      if (mediaImageInputMode === 'upload' && mediaImageUploadFile) {
+        const uploadResponse = await uploadBackstageImage({
+          file: mediaImageUploadFile,
+          category: 'products/media-hero',
+          updatedBy: editorId,
+        })
+        resolvedMediaHeroUrl = String(uploadResponse?.data?.url ?? '').trim()
+      }
+      if (detailImageInputMode === 'upload' && detailImageUploadFile) {
+        const uploadResponse = await uploadBackstageImage({
+          file: detailImageUploadFile,
+          category: 'products/detail-hero',
+          updatedBy: editorId,
+        })
+        resolvedDetailHeroUrl = String(uploadResponse?.data?.url ?? '').trim()
+      }
       const payload = {
         ...form,
+        media: { ...form.media, heroImageUrl: resolvedMediaHeroUrl },
+        detail: { ...form.detail, heroImageUrl: resolvedDetailHeroUrl },
         updatedBy: editorId,
       }
 
@@ -314,20 +428,26 @@ const ProductEditorPage = ({ mode }) => {
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Media</h2>
           <div className="mt-4 grid gap-4">
-            <FormField label="Hero Image URL" required error={getFieldError('media.heroImageUrl')}>
-              <input
-                value={form.media.heroImageUrl}
-                onChange={(event) => updateNestedField('media', 'heroImageUrl', event.target.value)}
-                onBlur={() => {
-                  syncHeroPreviewAfterBlur()
-                  validateByFieldName('media.heroImageUrl')
-                }}
-                className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-              />
-            </FormField>
+            <ImageSourceInputField
+              label="Hero Image URL"
+              required
+              mode={mediaImageInputMode}
+              onModeChange={handleMediaImageModeChange}
+              urlValue={form.media.heroImageUrl}
+              onUrlChange={(nextValue) => updateNestedField('media', 'heroImageUrl', nextValue)}
+              onUrlBlur={() => {
+                syncHeroPreviewAfterBlur()
+                validateByFieldName('media.heroImageUrl')
+              }}
+              urlError={getFieldError('media.heroImageUrl')}
+              uploadFile={mediaImageUploadFile}
+              onUploadFileChange={handleMediaImageFileChange}
+              onClearUploadFile={clearMediaUploadSelection}
+              uploadError={mediaImageUploadError}
+            />
             <div className="space-y-1 text-sm">
               <p className="font-medium text-slate-700">Background Preview</p>
-              {!heroPreviewUrl ? (
+              {!(mediaImageInputMode === 'upload' && mediaImageUploadPreviewUrl) && !heroPreviewUrl ? (
                 <div className="flex h-36 w-36 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
                   No image URL
                 </div>
@@ -340,7 +460,11 @@ const ProductEditorPage = ({ mode }) => {
                   ) : null}
                   <img
                     ref={previewImgRef}
-                    src={heroPreviewUrl}
+                    src={
+                      mediaImageInputMode === 'upload' && mediaImageUploadPreviewUrl
+                        ? mediaImageUploadPreviewUrl
+                        : heroPreviewUrl
+                    }
                     alt="Hero preview"
                     className={`h-full w-full object-cover ${heroPreviewState === 'error' ? 'hidden' : ''}`}
                     onLoad={() => setHeroPreviewState('loaded')}
@@ -381,18 +505,20 @@ const ProductEditorPage = ({ mode }) => {
                 className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
               />
             </FormField>
-            <FormField
+            <ImageSourceInputField
               label="Detail Hero Image URL"
               required
-              error={getFieldError('detail.heroImageUrl')}
-            >
-              <input
-                value={form.detail.heroImageUrl}
-                onChange={(event) => updateNestedField('detail', 'heroImageUrl', event.target.value)}
-                onBlur={() => validateByFieldName('detail.heroImageUrl')}
-                className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-              />
-            </FormField>
+              mode={detailImageInputMode}
+              onModeChange={handleDetailImageModeChange}
+              urlValue={form.detail.heroImageUrl}
+              onUrlChange={(nextValue) => updateNestedField('detail', 'heroImageUrl', nextValue)}
+              onUrlBlur={() => validateByFieldName('detail.heroImageUrl')}
+              urlError={getFieldError('detail.heroImageUrl')}
+              uploadFile={detailImageUploadFile}
+              onUploadFileChange={handleDetailImageFileChange}
+              onClearUploadFile={clearDetailUploadSelection}
+              uploadError={detailImageUploadError}
+            />
           </div>
         </section>
 

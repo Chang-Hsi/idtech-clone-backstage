@@ -1,4 +1,5 @@
 import {
+  ArrowUpTrayIcon,
   ClockIcon,
   DocumentDuplicateIcon,
   EyeIcon,
@@ -30,6 +31,12 @@ const SettingsProfileSection = ({
   setSettings,
   avatarUrlError,
   setAvatarUrlError,
+  avatarUploadError,
+  avatarInputMode,
+  setAvatarInputMode,
+  avatarUploadFile,
+  handleAvatarUploadFileChange,
+  clearAvatarUploadSelection,
   isValidHttpUrl,
   passwordCardRef,
   changePassword,
@@ -163,28 +170,94 @@ const SettingsProfileSection = ({
                   className="h-10 w-full rounded-md border border-slate-300 bg-slate-100 px-3 text-slate-500"
                 />
               </FormField>
-              <FormField label="Avatar URL" className="md:col-span-2" error={avatarUrlError}>
-                <input
-                  value={settings.profile.avatarUrl || ''}
-                  onChange={(event) => {
-                    const nextValue = event.target.value
-                    setSettings((prev) => ({ ...prev, profile: { ...prev.profile, avatarUrl: nextValue } }))
-                    setAvatarLoadError(false)
-                    if (avatarUrlError && isValidHttpUrl(nextValue)) {
-                      setAvatarUrlError('')
-                    }
-                  }}
-                  onBlur={(event) => {
-                    const nextValue = event.target.value
-                    if (!isValidHttpUrl(nextValue)) {
-                      setAvatarUrlError('Avatar URL must start with http:// or https://')
-                    } else {
-                      setAvatarUrlError('')
-                    }
-                  }}
-                  placeholder="https://..."
-                  className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-                />
+              <FormField
+                label={avatarInputMode === 'url' ? 'Avatar URL' : 'Upload Image'}
+                className="md:col-span-2"
+                error={avatarInputMode === 'url' ? avatarUrlError : avatarUploadError}
+              >
+                <div className="space-y-2">
+                  <div className="inline-flex rounded-md border border-slate-300 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setAvatarInputMode('url')}
+                      className={`rounded px-3 py-1 text-xs font-medium transition ${
+                        avatarInputMode === 'url'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      Avatar URL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarInputMode('upload')}
+                      className={`rounded px-3 py-1 text-xs font-medium transition ${
+                        avatarInputMode === 'upload'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      Upload Image
+                    </button>
+                  </div>
+
+                  {avatarInputMode === 'url' ? (
+                    <input
+                      value={settings.profile.avatarUrl || ''}
+                      onChange={(event) => {
+                        const nextValue = event.target.value
+                        setSettings((prev) => ({ ...prev, profile: { ...prev.profile, avatarUrl: nextValue } }))
+                        setAvatarLoadError(false)
+                        if (avatarUrlError && isValidHttpUrl(nextValue)) {
+                          setAvatarUrlError('')
+                        }
+                      }}
+                      onBlur={(event) => {
+                        const nextValue = event.target.value
+                        if (!isValidHttpUrl(nextValue)) {
+                          setAvatarUrlError('Avatar URL must start with http:// or https://')
+                        } else {
+                          setAvatarUrlError('')
+                        }
+                      }}
+                      placeholder="https://..."
+                      className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
+                    />
+                  ) : (
+                    <div className="rounded-md border border-dashed border-indigo-300 bg-indigo-50 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-indigo-500 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">
+                          <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+                          Choose File
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null
+                              handleAvatarUploadFileChange(file)
+                              event.target.value = ''
+                            }}
+                          />
+                        </label>
+                        {avatarUploadFile ? (
+                          <button
+                            type="button"
+                            onClick={clearAvatarUploadSelection}
+                            className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-white"
+                          >
+                            Clear
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {avatarUploadFile
+                          ? `Selected: ${avatarUploadFile.name}`
+                          : 'No file selected. Upload happens only after clicking Save Profile.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </FormField>
             </div>
           </section>

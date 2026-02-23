@@ -1,4 +1,5 @@
 import { request } from '../lib/request'
+import { uploadBackstageImage } from './backstageUploadsApi'
 
 export async function fetchBackstageSettings() {
   return request('/api/backstage/settings', { cache: 'no-store' })
@@ -48,4 +49,12 @@ export async function updateBackstageSettingsSecurityPolicies(payload) {
 
 export async function fetchBackstageSettingsAuditLogs() {
   return request('/api/backstage/settings/audit-logs', { cache: 'no-store' })
+}
+
+export async function uploadBackstageSettingsImage({ file, category = 'profile', updatedBy = '' }) {
+  return uploadBackstageImage({
+    file,
+    category,
+    updatedBy,
+  })
 }

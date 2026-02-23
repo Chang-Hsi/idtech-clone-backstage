@@ -7,7 +7,9 @@ import { useAuth } from '../../../features/auth/AuthContext'
 import FormField from '../../common/FormField'
 import DropdownSelect from '../../common/DropdownSelect'
 import StatusMessage from '../../common/StatusMessage'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import useFormValidation from '../../../hooks/useFormValidation'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import {
   fetchBackstageCompanyCareers,
   updateBackstageCompanyCareers,
@@ -61,6 +63,10 @@ const CareersJobEditorPage = ({ mode }) => {
   const [imagePreviewState, setImagePreviewState] = useState('idle')
   const previewBlurTimerRef = useRef(null)
   const previewImgRef = useRef(null)
+  const [imageInputMode, setImageInputMode] = useState('url')
+  const [imageUploadFile, setImageUploadFile] = useState(null)
+  const [imageUploadError, setImageUploadError] = useState('')
+  const [imageUploadPreviewUrl, setImageUploadPreviewUrl] = useState('')
 
   const regionTabs = useMemo(
     () => careersForm.tabs.filter((tab) => tab.key && tab.key !== 'all'),
@@ -98,6 +104,8 @@ const CareersJobEditorPage = ({ mode }) => {
           setJobForm(nextForm)
           setImagePreviewUrl(nextForm.imageUrl ?? '')
           if (!nextForm.imageUrl) setImagePreviewState('idle')
+          setImageInputMode('url')
+          clearImageUploadSelection()
         } else {
           const target = normalized.jobs.find((job) => job.slug === slug)
           if (!target) {
@@ -121,6 +129,8 @@ const CareersJobEditorPage = ({ mode }) => {
           setJobForm(nextForm)
           setImagePreviewUrl(nextForm.imageUrl ?? '')
           if (!nextForm.imageUrl) setImagePreviewState('idle')
+          setImageInputMode('url')
+          clearImageUploadSelection()
         }
 
         setStatus('success')
@@ -137,8 +147,9 @@ const CareersJobEditorPage = ({ mode }) => {
   useEffect(() => {
     return () => {
       if (previewBlurTimerRef.current) clearTimeout(previewBlurTimerRef.current)
+      if (imageUploadPreviewUrl) window.URL.revokeObjectURL(imageUploadPreviewUrl)
     }
-  }, [])
+  }, [imageUploadPreviewUrl])
 
   useEffect(() => {
     if (!imagePreviewUrl) {
@@ -193,6 +204,40 @@ const CareersJobEditorPage = ({ mode }) => {
     setJobForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  const clearImageUploadSelection = () => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    setImageUploadFile(null)
+    setImageUploadPreviewUrl('')
+    setImageUploadError('')
+  }
+
+  const handleImageModeChange = (mode) => {
+    if (mode === imageInputMode) return
+    setImageInputMode(mode)
+    if (mode === 'url') {
+      clearImageUploadSelection()
+      return
+    }
+    updateField('imageUrl', '')
+  }
+
+  const handleImageUploadFileChange = (file) => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    if (!file) {
+      setImageUploadFile(null)
+      setImageUploadPreviewUrl('')
+      setImageUploadError('')
+      return
+    }
+    setImageUploadFile(file)
+    setImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setImageUploadError('')
+  }
+
   const syncImagePreviewAfterBlur = () => {
     if (previewBlurTimerRef.current) clearTimeout(previewBlurTimerRef.current)
 
@@ -210,14 +255,19 @@ const CareersJobEditorPage = ({ mode }) => {
   }
 
   const save = async () => {
-    const nextJob = {
+    const validationJob = {
       ...jobForm,
       title: jobForm.title.trim(),
       region: jobForm.region.trim(),
       countryCode: jobForm.countryCode.trim().toLowerCase(),
       employmentType: jobForm.employmentType.trim(),
       locationLabel: jobForm.locationLabel.trim(),
-      imageUrl: jobForm.imageUrl.trim(),
+      imageUrl:
+        imageInputMode === 'upload'
+          ? imageUploadFile
+            ? 'https://placeholder.local/upload.webp'
+            : ''
+          : jobForm.imageUrl.trim(),
       summary: jobForm.summary.trim(),
       applyEmail: jobForm.applyEmail.trim(),
       jobDutiesMarkdown: jobForm.jobDutiesMarkdown.trim(),
@@ -227,10 +277,10 @@ const CareersJobEditorPage = ({ mode }) => {
     const quickValid = validateMany(
       validationSchema.map((field) => ({
         name: field.name,
-        validate: () => validateSchemaField(validationSchema, nextJob, field.name),
+        validate: () => validateSchemaField(validationSchema, validationJob, field.name),
       })),
     )
-    const validation = validateSchema(validationSchema, nextJob)
+    const validation = validateSchema(validationSchema, validationJob)
     if (!quickValid || !validation.valid) {
       setStatus('error')
       setErrorMessage('Please fix the validation errors before saving.')
@@ -245,6 +295,27 @@ const CareersJobEditorPage = ({ mode }) => {
     setSuccessMessage('')
 
     try {
+      let resolvedImageUrl = validationJob.imageUrl
+      if (imageInputMode === 'upload' && imageUploadFile) {
+        try {
+          const uploaded = await uploadBackstageImage(imageUploadFile)
+          const uploadedUrl = String(uploaded?.data?.url ?? '').trim()
+          if (!uploadedUrl) throw new Error('Image upload succeeded but no URL was returned.')
+          resolvedImageUrl = uploadedUrl
+          setImageUploadError('')
+        } catch (error) {
+          setStatus('error')
+          setImageUploadError(error.message || 'Unable to upload image.')
+          setErrorMessage(error.message || 'Unable to upload image.')
+          return
+        }
+      }
+
+      const nextJob = {
+        ...validationJob,
+        imageUrl: resolvedImageUrl,
+      }
+
       const nextJobs =
         mode === 'create'
           ? [
@@ -389,21 +460,32 @@ const CareersJobEditorPage = ({ mode }) => {
             />
           </FormField>
 
-          <FormField label="Image URL" required className="md:col-span-2" error={getFieldError('imageUrl')}>
-            <input
-              value={jobForm.imageUrl}
-              onChange={(event) => updateField('imageUrl', event.target.value)}
-              onBlur={() => {
-                syncImagePreviewAfterBlur()
-                validateByFieldName('imageUrl')
-              }}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-            />
-          </FormField>
+          <ImageSourceInputField
+            label="Image URL"
+            mode={imageInputMode}
+            onModeChange={handleImageModeChange}
+            urlValue={jobForm.imageUrl}
+            onUrlChange={(value) => updateField('imageUrl', value)}
+            onUrlBlur={() => {
+              syncImagePreviewAfterBlur()
+              validateByFieldName('imageUrl')
+            }}
+            urlError={getFieldError('imageUrl')}
+            uploadFile={imageUploadFile}
+            onUploadFileChange={handleImageUploadFileChange}
+            onClearUploadFile={clearImageUploadSelection}
+            uploadError={imageUploadError}
+            className="md:col-span-2"
+            required
+          />
 
           <div className="md:col-span-2">
             <p className="mb-2 text-sm font-medium text-slate-700">Image Preview</p>
-            {!imagePreviewUrl ? (
+            {imageInputMode === 'upload' && imageUploadPreviewUrl ? (
+              <div className="relative h-28 w-28 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                <img src={imageUploadPreviewUrl} alt="Career job upload preview" className="h-full w-full object-cover" />
+              </div>
+            ) : !imagePreviewUrl ? (
               <div className="flex h-28 w-28 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
                 No image URL
               </div>

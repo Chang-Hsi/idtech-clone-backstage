@@ -17,9 +17,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../features/auth/AuthContext'
 import DropdownSelect from '../../common/DropdownSelect'
 import FormField from '../../common/FormField'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
 import StatusMessage from '../../common/StatusMessage'
 import useFormValidation from '../../../hooks/useFormValidation'
 import { fetchBackstageCompanyAboutUs, updateBackstageCompanyAboutUs } from '../../../api/backstageCompanyAboutUsApi'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
 import { customRule, emailRule, enumRule, phoneLooseRule, requiredRule } from '../../../utils/validation/rules'
 import { buildAboutUsPageValidationSchema } from './AboutUsPageEditor.schema'
@@ -43,6 +45,7 @@ const parseYearSortKey = (yearLabel) => {
 const bySortOrder = (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
 
 const withSortOrder = (items) => items.map((item, index) => ({ ...item, sortOrder: index }))
+const IMAGE_KEY_INTRO = 'intro'
 
 const buildTimelineYearOptions = () => {
   const currentDecade = Math.floor(new Date().getFullYear() / 10) * 10
@@ -329,18 +332,102 @@ const AboutUsPageEditor = () => {
     status: TAB_ACTIVE,
   })
   const [officeDialogErrors, setOfficeDialogErrors] = useState({})
+  const [imageInputModes, setImageInputModes] = useState({ [IMAGE_KEY_INTRO]: 'url' })
+  const [imageUploadFiles, setImageUploadFiles] = useState({})
+  const [imageUploadErrors, setImageUploadErrors] = useState({})
+  const [imageUploadPreviewUrls, setImageUploadPreviewUrls] = useState({})
   const validationSchema = useMemo(() => buildAboutUsPageValidationSchema(form), [form])
   const timelineYearOptions = useMemo(() => buildTimelineYearOptions(), [])
 
   const validateByFieldName = (fieldName) =>
     validateField(fieldName, () => validateSchemaField(validationSchema, form, fieldName))
 
+  const resetImageUploadStates = (modes) => {
+    setImageInputModes(modes)
+    setImageUploadFiles({})
+    setImageUploadErrors({})
+    setImageUploadPreviewUrls((prev) => {
+      Object.values(prev).forEach((url) => {
+        if (url) window.URL.revokeObjectURL(url)
+      })
+      return {}
+    })
+  }
+
+  const clearImageUploadSelection = (key) => {
+    setImageUploadFiles((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+    setImageUploadErrors((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+    setImageUploadPreviewUrls((prev) => {
+      const next = { ...prev }
+      if (next[key]) window.URL.revokeObjectURL(next[key])
+      delete next[key]
+      return next
+    })
+  }
+
+  const setImageInputMode = (key, mode) => {
+    setImageInputModes((prev) => ({ ...prev, [key]: mode }))
+  }
+
+  const handleImageModeChange = (key, mode) => {
+    if ((imageInputModes[key] ?? 'url') === mode) return
+    setImageInputMode(key, mode)
+    if (mode === 'url') {
+      clearImageUploadSelection(key)
+      return
+    }
+    if (key === IMAGE_KEY_INTRO) {
+      updateIntroField('imageUrl', '')
+      return
+    }
+    updateListItem('highlights', key, 'imageUrl', '')
+  }
+
+  const handleImageUploadFileChange = (key, file) => {
+    setImageUploadPreviewUrls((prev) => {
+      const next = { ...prev }
+      if (next[key]) window.URL.revokeObjectURL(next[key])
+      if (file) {
+        next[key] = window.URL.createObjectURL(file)
+      } else {
+        delete next[key]
+      }
+      return next
+    })
+    setImageUploadFiles((prev) => {
+      if (!file) {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+      return { ...prev, [key]: file }
+    })
+    setImageUploadErrors((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
   useEffect(() => {
     const load = async () => {
       try {
         const payload = await fetchBackstageCompanyAboutUs()
         const page = payload?.data?.aboutUsPage
-        setForm(normalizePayload(page))
+        const normalized = normalizePayload(page)
+        setForm(normalized)
+        resetImageUploadStates({
+          [IMAGE_KEY_INTRO]: 'url',
+          ...Object.fromEntries(normalized.highlights.map((item) => [item.id, 'url'])),
+        })
         setUpdatedAt(page?.updatedAt ?? '')
         setStatus('success')
         setValidationErrors([])
@@ -353,6 +440,14 @@ const AboutUsPageEditor = () => {
 
     load()
   }, [clearAll])
+
+  useEffect(() => {
+    return () => {
+      Object.values(imageUploadPreviewUrls).forEach((url) => {
+        if (url) window.URL.revokeObjectURL(url)
+      })
+    }
+  }, [imageUploadPreviewUrls])
 
   const updateIntroField = (field, value) => {
     setForm((prev) => ({ ...prev, intro: { ...prev.intro, [field]: value } }))
@@ -399,12 +494,13 @@ const AboutUsPageEditor = () => {
   }
 
   const addHighlight = () => {
+    const nextId = createId('highlight')
     setForm((prev) => ({
       ...prev,
       highlights: withSortOrder([
         ...prev.highlights,
         {
-          id: createId('highlight'),
+          id: nextId,
           eyebrow: '',
           title: '',
           imageUrl: '',
@@ -413,6 +509,7 @@ const AboutUsPageEditor = () => {
         },
       ]),
     }))
+    setImageInputModes((prev) => ({ ...prev, [nextId]: 'url' }))
   }
 
   const openCreateTimelineDialog = () => {
@@ -656,6 +753,12 @@ const AboutUsPageEditor = () => {
   }
 
   const removeHighlight = (id) => {
+    clearImageUploadSelection(id)
+    setImageInputModes((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
     setForm((prev) => ({ ...prev, highlights: withSortOrder(prev.highlights.filter((item) => item.id !== id)) }))
   }
   const removeTimelineItem = (id) => {
@@ -745,13 +848,34 @@ const AboutUsPageEditor = () => {
   }
 
   const save = async () => {
+    const validationForm = {
+      ...form,
+      intro: {
+        ...form.intro,
+        imageUrl:
+          (imageInputModes[IMAGE_KEY_INTRO] ?? 'url') === 'upload'
+            ? imageUploadFiles[IMAGE_KEY_INTRO]
+              ? 'https://placeholder.local/upload.webp'
+              : ''
+            : form.intro.imageUrl,
+      },
+      highlights: form.highlights.map((item) => ({
+        ...item,
+        imageUrl:
+          (imageInputModes[item.id] ?? 'url') === 'upload'
+            ? imageUploadFiles[item.id]
+              ? 'https://placeholder.local/upload.webp'
+              : ''
+            : item.imageUrl,
+      })),
+    }
     const quickValid = validateMany(
       validationSchema.map((field) => ({
         name: field.name,
-        validate: () => validateSchemaField(validationSchema, form, field.name),
+        validate: () => validateSchemaField(validationSchema, validationForm, field.name),
       })),
     )
-    const validation = validateSchema(validationSchema, form)
+    const validation = validateSchema(validationSchema, validationForm)
     if (!quickValid || !validation.valid) {
       setStatus('error')
       setErrorMessage('Please fix the validation errors before saving.')
@@ -765,21 +889,71 @@ const AboutUsPageEditor = () => {
     setSuccessMessage('')
 
     try {
+      let introImageUrl = String(validationForm.intro.imageUrl ?? '').trim()
+      if ((imageInputModes[IMAGE_KEY_INTRO] ?? 'url') === 'upload' && imageUploadFiles[IMAGE_KEY_INTRO]) {
+        try {
+          const uploaded = await uploadBackstageImage(imageUploadFiles[IMAGE_KEY_INTRO])
+          const uploadedUrl = String(uploaded?.data?.url ?? '').trim()
+          if (!uploadedUrl) throw new Error('Image upload succeeded but no URL was returned.')
+          introImageUrl = uploadedUrl
+          setImageUploadErrors((prev) => {
+            const next = { ...prev }
+            delete next[IMAGE_KEY_INTRO]
+            return next
+          })
+        } catch (uploadError) {
+          setStatus('error')
+          setErrorMessage(uploadError.message || 'Unable to upload intro image.')
+          setImageUploadErrors((prev) => ({
+            ...prev,
+            [IMAGE_KEY_INTRO]: uploadError.message || 'Unable to upload intro image.',
+          }))
+          return
+        }
+      }
+
+      const resolvedHighlights = []
+      for (const highlight of validationForm.highlights) {
+        let imageUrl = String(highlight.imageUrl ?? '').trim()
+        if ((imageInputModes[highlight.id] ?? 'url') === 'upload' && imageUploadFiles[highlight.id]) {
+          try {
+            const uploaded = await uploadBackstageImage(imageUploadFiles[highlight.id])
+            const uploadedUrl = String(uploaded?.data?.url ?? '').trim()
+            if (!uploadedUrl) throw new Error('Image upload succeeded but no URL was returned.')
+            imageUrl = uploadedUrl
+            setImageUploadErrors((prev) => {
+              const next = { ...prev }
+              delete next[highlight.id]
+              return next
+            })
+          } catch (uploadError) {
+            setStatus('error')
+            setErrorMessage(uploadError.message || 'Unable to upload highlight image.')
+            setImageUploadErrors((prev) => ({
+              ...prev,
+              [highlight.id]: uploadError.message || 'Unable to upload highlight image.',
+            }))
+            return
+          }
+        }
+        resolvedHighlights.push({ ...highlight, imageUrl })
+      }
+
       const payload = {
         intro: {
-          title: form.intro.title,
-          paragraphs: form.intro.paragraphs.filter((item) => item.trim().length > 0),
-          imageUrl: form.intro.imageUrl,
+          title: validationForm.intro.title,
+          paragraphs: validationForm.intro.paragraphs.filter((item) => item.trim().length > 0),
+          imageUrl: introImageUrl,
         },
-        highlights: form.highlights,
+        highlights: resolvedHighlights,
         innovationTimeline: {
-          title: form.innovationTimeline.title,
-          items: form.innovationTimeline.items,
+          title: validationForm.innovationTimeline.title,
+          items: validationForm.innovationTimeline.items,
         },
         connectInfo: {
-          title: form.connectInfo.title,
-          description: form.connectInfo.description,
-          offices: form.connectInfo.offices,
+          title: validationForm.connectInfo.title,
+          description: validationForm.connectInfo.description,
+          offices: validationForm.connectInfo.offices,
         },
         updatedBy: editorId,
       }
@@ -838,16 +1012,29 @@ const AboutUsPageEditor = () => {
             />
           </FormField>
 
-          <FormField label="Image URL" required error={getFieldError('intro.imageUrl')}>
-            <input
-              value={form.intro.imageUrl}
-              onChange={(event) => updateIntroField('imageUrl', event.target.value)}
-              onBlur={() => validateByFieldName('intro.imageUrl')}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-indigo-500"
-            />
-          </FormField>
+          <ImageSourceInputField
+            label="Image URL"
+            mode={imageInputModes[IMAGE_KEY_INTRO] ?? 'url'}
+            onModeChange={(mode) => handleImageModeChange(IMAGE_KEY_INTRO, mode)}
+            urlValue={form.intro.imageUrl}
+            onUrlChange={(value) => updateIntroField('imageUrl', value)}
+            onUrlBlur={() => validateByFieldName('intro.imageUrl')}
+            urlError={getFieldError('intro.imageUrl')}
+            uploadFile={imageUploadFiles[IMAGE_KEY_INTRO] ?? null}
+            onUploadFileChange={(file) => handleImageUploadFileChange(IMAGE_KEY_INTRO, file)}
+            onClearUploadFile={() => clearImageUploadSelection(IMAGE_KEY_INTRO)}
+            uploadError={imageUploadErrors[IMAGE_KEY_INTRO] ?? ''}
+            required
+          />
 
-          <ImageUrlPreview url={form.intro.imageUrl} alt="About Us intro preview" />
+          <ImageUrlPreview
+            url={
+              (imageInputModes[IMAGE_KEY_INTRO] ?? 'url') === 'upload'
+                ? imageUploadPreviewUrls[IMAGE_KEY_INTRO] ?? ''
+                : form.intro.imageUrl
+            }
+            alt="About Us intro preview"
+          />
 
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700">Paragraphs</p>
@@ -906,9 +1093,29 @@ const AboutUsPageEditor = () => {
                     <div className="grid gap-3 md:grid-cols-2">
                       <input value={item.eyebrow} onChange={(event) => updateListItem('highlights', item.id, 'eyebrow', event.target.value)} placeholder="Eyebrow" className="h-9 rounded-md border border-slate-300 px-2 text-sm outline-none focus:border-indigo-500" />
                       <input value={item.title} onChange={(event) => updateListItem('highlights', item.id, 'title', event.target.value)} placeholder="Title" className="h-9 rounded-md border border-slate-300 px-2 text-sm outline-none focus:border-indigo-500" />
-                      <input value={item.imageUrl} onChange={(event) => updateListItem('highlights', item.id, 'imageUrl', event.target.value)} placeholder="Image URL" className="h-9 rounded-md border border-slate-300 px-2 text-sm outline-none focus:border-indigo-500 md:col-span-2" />
+                      <ImageSourceInputField
+                        label="Image URL"
+                        mode={imageInputModes[item.id] ?? 'url'}
+                        onModeChange={(mode) => handleImageModeChange(item.id, mode)}
+                        urlValue={item.imageUrl}
+                        onUrlChange={(value) => updateListItem('highlights', item.id, 'imageUrl', value)}
+                        urlError=""
+                        uploadFile={imageUploadFiles[item.id] ?? null}
+                        onUploadFileChange={(file) => handleImageUploadFileChange(item.id, file)}
+                        onClearUploadFile={() => clearImageUploadSelection(item.id)}
+                        uploadError={imageUploadErrors[item.id] ?? ''}
+                        className="md:col-span-2"
+                        required
+                      />
                       <div className="md:col-span-2">
-                        <ImageUrlPreview url={item.imageUrl} alt={`${item.title || 'Highlight'} preview`} />
+                        <ImageUrlPreview
+                          url={
+                            (imageInputModes[item.id] ?? 'url') === 'upload'
+                              ? imageUploadPreviewUrls[item.id] ?? ''
+                              : item.imageUrl
+                          }
+                          alt={`${item.title || 'Highlight'} preview`}
+                        />
                       </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between">

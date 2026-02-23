@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import ImageSourceInputField from '../../common/ImageSourceInputField'
+import { uploadBackstageImage } from '../../../api/backstageUploadsApi'
 import useFormValidation from '../../../hooks/useFormValidation'
 import { validateSchema, validateSchemaField } from '../../../utils/validation/engine'
 import { buildBannerHubRowEditorSchema } from './BannerHubRowEditorDrawer.schema'
@@ -16,6 +18,10 @@ const BannerHubRowEditorDrawer = ({
   const [previewState, setPreviewState] = useState(() =>
     item?.backgroundImageUrl?.trim() ? 'loading' : 'idle'
   )
+  const [imageInputMode, setImageInputMode] = useState('url')
+  const [imageUploadFile, setImageUploadFile] = useState(null)
+  const [imageUploadError, setImageUploadError] = useState('')
+  const [imageUploadPreviewUrl, setImageUploadPreviewUrl] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [validationErrors, setValidationErrors] = useState([])
   const blurTimerRef = useRef(null)
@@ -26,8 +32,11 @@ const BannerHubRowEditorDrawer = ({
       if (blurTimerRef.current) {
         clearTimeout(blurTimerRef.current)
       }
+      if (imageUploadPreviewUrl) {
+        window.URL.revokeObjectURL(imageUploadPreviewUrl)
+      }
     }
-  }, [])
+  }, [imageUploadPreviewUrl])
 
   if (!isOpen || !draft) return null
 
@@ -35,23 +44,88 @@ const BannerHubRowEditorDrawer = ({
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
 
-  const apply = () => {
+  const clearImageUploadSelection = () => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    setImageUploadFile(null)
+    setImageUploadPreviewUrl('')
+    setImageUploadError('')
+  }
+
+  const handleImageModeChange = (mode) => {
+    if (mode === imageInputMode) return
+    setImageInputMode(mode)
+    if (mode === 'url') {
+      clearImageUploadSelection()
+      return
+    }
+    update('backgroundImageUrl', '')
+  }
+
+  const handleImageUploadFileChange = (file) => {
+    if (imageUploadPreviewUrl) {
+      window.URL.revokeObjectURL(imageUploadPreviewUrl)
+    }
+    if (!file) {
+      setImageUploadFile(null)
+      setImageUploadPreviewUrl('')
+      setImageUploadError('')
+      return
+    }
+    setImageUploadFile(file)
+    setImageUploadPreviewUrl(window.URL.createObjectURL(file))
+    setImageUploadError('')
+  }
+
+  const apply = async () => {
+    const validationDraft =
+      tab === 'detail' || tab === 'product'
+        ? {
+            ...draft,
+            backgroundImageUrl:
+              imageInputMode === 'upload'
+                ? imageUploadFile
+                  ? 'https://placeholder.local/upload.webp'
+                  : ''
+                : draft.backgroundImageUrl,
+          }
+        : draft
     const quickValid = validateMany(
       validationSchema.map((field) => ({
         name: field.name,
-        validate: () => validateSchemaField(validationSchema, draft, field.name),
+        validate: () => validateSchemaField(validationSchema, validationDraft, field.name),
       }))
     )
-    const validation = validateSchema(validationSchema, draft)
+    const validation = validateSchema(validationSchema, validationDraft)
     if (!quickValid || !validation.valid) {
       setErrorMessage('Please fix validation errors before apply.')
       setValidationErrors(validation.errors)
       return
     }
+
+    let resolvedBackgroundImageUrl = validationDraft.backgroundImageUrl
+    if ((tab === 'detail' || tab === 'product') && imageInputMode === 'upload' && imageUploadFile) {
+      try {
+        const uploaded = await uploadBackstageImage(imageUploadFile)
+        const uploadedUrl = String(uploaded?.data?.url ?? '').trim()
+        if (!uploadedUrl) throw new Error('Image upload succeeded but no URL was returned.')
+        resolvedBackgroundImageUrl = uploadedUrl
+        setImageUploadError('')
+      } catch (error) {
+        setErrorMessage(error.message || 'Unable to upload image.')
+        setImageUploadError(error.message || 'Unable to upload image.')
+        return
+      }
+    }
+
     setErrorMessage('')
     setValidationErrors([])
     clearAll()
-    onApply(draft)
+    onApply({
+      ...validationDraft,
+      backgroundImageUrl: resolvedBackgroundImageUrl,
+    })
   }
 
   const syncPreviewAfterBlur = () => {
@@ -141,31 +215,35 @@ const BannerHubRowEditorDrawer = ({
           </label>
 
           {tab === 'detail' || tab === 'product' ? (
-            <label className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-700">
-                Background Image URL<span className="ml-1 text-red-500">*</span>
-              </span>
-              <input
-                value={draft.backgroundImageUrl ?? ''}
-                onChange={(event) => update('backgroundImageUrl', event.target.value)}
-                onBlur={() => {
-                  syncPreviewAfterBlur()
-                  validateField('backgroundImageUrl', () =>
-                    validateSchemaField(validationSchema, draft, 'backgroundImageUrl')
-                  )
-                }}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
-              />
-              {getFieldError('backgroundImageUrl') ? (
-                <p className="text-xs text-red-600">{getFieldError('backgroundImageUrl')}</p>
-              ) : null}
-            </label>
+            <ImageSourceInputField
+              label="Background Image URL"
+              mode={imageInputMode}
+              onModeChange={handleImageModeChange}
+              urlValue={draft.backgroundImageUrl ?? ''}
+              onUrlChange={(value) => update('backgroundImageUrl', value)}
+              onUrlBlur={() => {
+                syncPreviewAfterBlur()
+                validateField('backgroundImageUrl', () =>
+                  validateSchemaField(validationSchema, draft, 'backgroundImageUrl')
+                )
+              }}
+              urlError={getFieldError('backgroundImageUrl')}
+              uploadFile={imageUploadFile}
+              onUploadFileChange={handleImageUploadFileChange}
+              onClearUploadFile={clearImageUploadSelection}
+              uploadError={imageUploadError}
+              required
+            />
           ) : null}
 
           {tab === 'detail' || tab === 'product' ? (
             <div className="space-y-1 text-sm">
               <p className="font-medium text-slate-700">Background Preview</p>
-              {!previewUrl ? (
+              {imageInputMode === 'upload' && imageUploadPreviewUrl ? (
+                <div className="relative overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                  <img src={imageUploadPreviewUrl} alt="Background upload preview" className="h-32 w-full object-cover" />
+                </div>
+              ) : !previewUrl ? (
                 <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
                   No image URL
                 </div>
