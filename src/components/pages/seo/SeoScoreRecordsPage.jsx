@@ -74,6 +74,17 @@ const SeoScoreRecordsPage = () => {
   const [trigger, setTrigger] = useState(null)
   const [isTriggering, setIsTriggering] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const showRunnerIndicator = import.meta.env.DEV
+  const runner = trigger?.runner ?? null
+  const isRunnerOnline = String(runner?.status ?? '').toLowerCase() === 'online'
+  const runnerDotClass = isRunnerOnline ? 'bg-emerald-500' : 'bg-red-500'
+  const runnerHint = runner?.requiresSelfHosted
+    ? isRunnerOnline
+      ? runner?.busy
+        ? `Runner online (busy)${runner?.name ? `: ${runner.name}` : ''}`
+        : `Runner online${runner?.name ? `: ${runner.name}` : ''}`
+      : `Runner offline${runner?.requiredLabel ? ` (required: ${runner.requiredLabel})` : ''}`
+    : 'GitHub hosted mode'
 
   const load = async ({ silent = false } = {}) => {
     if (!silent) {
@@ -194,6 +205,12 @@ const SeoScoreRecordsPage = () => {
         >
           {isTriggering ? 'Triggering...' : trigger?.isRunning ? 'CI Running...' : 'Run CI Workflow'}
         </button>
+        {showRunnerIndicator ? (
+          <span className="ml-3 mt-3 inline-flex h-9 items-center gap-2 text-xs text-slate-600" title={runnerHint}>
+            <span className={`inline-block h-2.5 w-2.5 rounded-full ${runnerDotClass}`} />
+            <span>Runner</span>
+          </span>
+        ) : null}
       </div>
 
       {errorMessage ? (

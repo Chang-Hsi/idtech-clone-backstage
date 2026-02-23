@@ -3,6 +3,7 @@ import StatusMessage from '../components/common/StatusMessage'
 import DashboardHeader from '../components/pages/dashboard/DashboardHeader'
 import DashboardKpiRow from '../components/pages/dashboard/DashboardKpiRow'
 import DashboardTestingHealthPanel from '../components/pages/dashboard/DashboardTestingHealthPanel'
+import DashboardLighthouseSnapshotPanel from '../components/pages/dashboard/DashboardLighthouseSnapshotPanel'
 import DashboardGeoDistributionPanel from '../components/pages/dashboard/DashboardGeoDistributionPanel'
 import DashboardContentChartsPanel from '../components/pages/dashboard/DashboardContentChartsPanel'
 import DashboardUserPanel from '../components/pages/dashboard/DashboardUserPanel'
@@ -20,6 +21,7 @@ const DashboardPageManager = () => {
     kpiCards,
     contentMixData,
     contentStatusData,
+    lighthouseSnapshot,
     testingSummary,
     testingHistory,
     geoFeatures,
@@ -66,6 +68,8 @@ const DashboardPageManager = () => {
             isTriggering={isTriggering}
             onTrigger={triggerTestingRefresh}
           />
+
+          <DashboardLighthouseSnapshotPanel snapshot={lighthouseSnapshot} />
 
           <DashboardGeoDistributionPanel
             features={geoFeatures}

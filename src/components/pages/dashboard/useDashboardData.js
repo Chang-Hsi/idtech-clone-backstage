@@ -34,6 +34,7 @@ export default function useDashboardData() {
   const [kpiCards, setKpiCards] = useState([])
   const [contentMixData, setContentMixData] = useState([])
   const [contentStatusData, setContentStatusData] = useState([])
+  const [lighthouseSnapshot, setLighthouseSnapshot] = useState(null)
 
   const [geoFeatures, setGeoFeatures] = useState([])
   const [geoCountryData, setGeoCountryData] = useState([])
@@ -74,6 +75,7 @@ export default function useDashboardData() {
       setKpiCards(Array.isArray(summary.kpiCards) ? summary.kpiCards : [])
       setContentMixData(Array.isArray(summary.contentMixData) ? summary.contentMixData : [])
       setContentStatusData(Array.isArray(summary.contentStatusData) ? summary.contentStatusData : [])
+      setLighthouseSnapshot(summary.lighthouse ?? null)
       setRegions(Array.isArray(summary.regions) ? summary.regions : [])
       setAllRegionEmployees(Array.isArray(summary.selectedRegionEmployees) ? summary.selectedRegionEmployees : [])
       setGeoCountryDataAll(Array.isArray(summary.geoCountryDataAll) ? summary.geoCountryDataAll : [])
@@ -206,6 +208,7 @@ export default function useDashboardData() {
     kpiCards,
     contentMixData,
     contentStatusData,
+    lighthouseSnapshot,
     testingSummary,
     testingHistory,
     geoFeatures,

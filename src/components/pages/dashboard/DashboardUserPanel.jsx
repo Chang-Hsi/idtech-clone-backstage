@@ -113,7 +113,15 @@ const DashboardUserPanel = ({ userProfile, sessionExpiresAt, permissionRadarData
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Recent 5 Actions</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-900">Recent 5 Actions</h2>
+          <Link
+            to="/settings/profile"
+            className="text-xs font-medium text-slate-500 transition hover:text-slate-700"
+          >
+            View More Records
+          </Link>
+        </div>
         <div className="mt-3 space-y-2">
           {recentActions.length === 0 ? (
             <p className="text-xs text-slate-500">No activity found for current user.</p>
