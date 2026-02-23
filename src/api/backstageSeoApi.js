@@ -1,4 +1,4 @@
-import { request } from '../lib/request'
+import { request, toAbsoluteUrl } from '../lib/request'
 
 export async function fetchBackstageSeoTargets({
   q = '',
@@ -64,4 +64,11 @@ export async function triggerBackstageSeoLighthouseWorkflow({ force = false } = 
     method: 'POST',
     body: JSON.stringify({ force: Boolean(force) }),
   })
+}
+
+export function getBackstageSeoScoreRecordsEventsUrl({ repository = 'Chang-Hsi/idtech-clone' } = {}) {
+  const search = new URLSearchParams({
+    repository: String(repository ?? '').trim() || 'Chang-Hsi/idtech-clone',
+  })
+  return toAbsoluteUrl(`/api/backstage/seo/score-records/events?${search.toString()}`)
 }

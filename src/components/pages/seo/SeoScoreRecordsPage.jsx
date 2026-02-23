@@ -9,7 +9,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { fetchBackstageSeoScoreRecords, triggerBackstageSeoLighthouseWorkflow } from '../../../api/backstageSeoApi'
+import {
+  fetchBackstageSeoScoreRecords,
+  getBackstageSeoScoreRecordsEventsUrl,
+  triggerBackstageSeoLighthouseWorkflow,
+} from '../../../api/backstageSeoApi'
 import StatusMessage from '../../common/StatusMessage'
 
 const formatDateTime = (value) => {
@@ -102,13 +106,19 @@ const SeoScoreRecordsPage = () => {
   }, [])
 
   useEffect(() => {
-    if (!trigger?.isRunning) return undefined
-    const timer = window.setInterval(() => {
+    const eventUrl = getBackstageSeoScoreRecordsEventsUrl({ repository })
+    const source = new EventSource(eventUrl, { withCredentials: true })
+    source.addEventListener('run-updated', () => {
       void load({ silent: true })
-    }, 8000)
-    return () => window.clearInterval(timer)
+    })
+    source.onerror = () => {
+      // Keep latest data from regular fetch; SSE may reconnect automatically.
+    }
+    return () => {
+      source.close()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trigger?.isRunning, repository, pullRequestNumber, targetUrl])
+  }, [repository])
 
   const chartData = useMemo(
     () =>

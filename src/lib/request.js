@@ -13,7 +13,7 @@ const AUTH_WHITELIST_PATHS = new Set(['/api/backstage/auth/login', '/api/backsta
 let unauthorizedHandler = null
 let lastUnauthorizedNotifiedAt = 0
 
-const toAbsoluteUrl = (path) => {
+export const toAbsoluteUrl = (path) => {
   const normalizedBase = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
   return `${normalizedBase}${normalizedPath}`
