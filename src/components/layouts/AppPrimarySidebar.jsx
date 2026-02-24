@@ -76,13 +76,16 @@ const AppPrimarySidebar = ({ items, activeKey, user, onLogout }) => {
                   to={item.to}
                   title={item.label}
                   aria-label={item.label}
-                  className={`flex h-11 w-11 items-center justify-center rounded-md transition ${
+                  className={`relative flex h-11 w-11 items-center justify-center rounded-md transition ${
                     isActive
                       ? 'bg-indigo-100 text-indigo-600'
                       : 'text-slate-300 hover:bg-slate-200/30 hover:text-white'
                   }`}
                 >
                   <Icon className="h-5 w-5" />
+                  {item.hasUnreadDot ? (
+                    <span className="absolute right-2 top-2 inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  ) : null}
                 </NavLink>
               )
             })}

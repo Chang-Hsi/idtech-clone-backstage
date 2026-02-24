@@ -47,6 +47,9 @@ export default function useDashboardData() {
   const [userProfile, setUserProfile] = useState(null)
   const [permissionRadarData, setPermissionRadarData] = useState([])
   const [recentActions, setRecentActions] = useState([])
+  const [hasPendingSubmissions, setHasPendingSubmissions] = useState(false)
+  const [pendingMessageItems, setPendingMessageItems] = useState([])
+  const [submissionStatusRatio, setSubmissionStatusRatio] = useState([])
 
   const loadDashboard = useCallback(async ({ preserveStatus = false } = {}) => {
     if (!preserveStatus) setStatus('loading')
@@ -81,6 +84,33 @@ export default function useDashboardData() {
       setGeoCountryDataAll(Array.isArray(summary.geoCountryDataAll) ? summary.geoCountryDataAll : [])
       setUserProfile(summary.userProfile ?? null)
       setPermissionRadarData(Array.isArray(summary.permissionRadarData) ? summary.permissionRadarData : [])
+      const submissionsOverview =
+        summary?.submissionsOverview && typeof summary.submissionsOverview === 'object'
+          ? summary.submissionsOverview
+          : {}
+      setHasPendingSubmissions(Boolean(submissionsOverview?.hasPending))
+      setPendingMessageItems(
+        Array.isArray(submissionsOverview?.pendingItems)
+          ? submissionsOverview.pendingItems.map((item) => ({
+              id: item.id,
+              source: item.source,
+              status: item.status,
+              name: item.name,
+              email: item.email,
+              message: item.message,
+              createdAt: item.createdAt,
+            }))
+          : [],
+      )
+      setSubmissionStatusRatio(
+        Array.isArray(submissionsOverview?.statusRatio)
+          ? submissionsOverview.statusRatio.map((item) => ({
+              name: item?.name,
+              status: item?.status,
+              value: Number(item?.value ?? 0),
+            }))
+          : [],
+      )
       const personalLogs = Array.isArray(summary.recentActions)
         ? summary.recentActions.map((item) => ({
             id: item.id,
@@ -221,6 +251,9 @@ export default function useDashboardData() {
     userProfile,
     permissionRadarData,
     recentActions,
+    hasPendingSubmissions,
+    pendingMessageItems,
+    submissionStatusRatio,
     setSelectedRegionCode,
     refreshDashboard: loadDashboard,
     triggerTestingRefresh: handleTriggerTestingRefresh,

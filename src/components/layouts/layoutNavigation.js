@@ -1,5 +1,6 @@
 import {
   Cog6ToothIcon,
+  EnvelopeIcon,
   HomeIcon,
   MagnifyingGlassIcon,
   RectangleStackIcon,
@@ -9,6 +10,7 @@ export const PRIMARY_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: HomeIcon },
   { key: 'pages', label: 'Pages', to: '/pages/home', icon: RectangleStackIcon },
   { key: 'seo', label: 'SEO', to: '/seo', icon: MagnifyingGlassIcon },
+  { key: 'submissions', label: 'Messages', to: '/submissions/lead/new', icon: EnvelopeIcon },
   { key: 'settings', label: 'Settings', to: '/settings/profile', icon: Cog6ToothIcon },
 ]
 
@@ -57,6 +59,36 @@ export const SECONDARY_NAV_CONFIG = {
           { label: 'Employees', to: '/settings/employees' },
           { label: 'Security Policies', to: '/settings/security' },
           { label: 'Audit Logs', to: '/settings/audit' },
+        ],
+      },
+    ],
+  },
+  submissions: {
+    title: 'Message Center',
+    searchEnabled: false,
+    groups: [
+      {
+        title: 'Connect Types',
+        items: [
+          { label: 'Pending', to: '/submissions/lead/new' },
+          { label: 'Completed', to: '/submissions/lead/resolved' },
+          { label: 'Archived', to: '/submissions/lead/archived' },
+        ],
+      },
+      {
+        title: 'Contact Types',
+        items: [
+          { label: 'Pending', to: '/submissions/contact/new' },
+          { label: 'Completed', to: '/submissions/contact/resolved' },
+          { label: 'Archived', to: '/submissions/contact/archived' },
+        ],
+      },
+      {
+        title: 'Career Types',
+        items: [
+          { label: 'Pending', to: '/submissions/career/new' },
+          { label: 'Completed', to: '/submissions/career/resolved' },
+          { label: 'Archived', to: '/submissions/career/archived' },
         ],
       },
     ],

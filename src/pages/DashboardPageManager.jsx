@@ -34,6 +34,9 @@ const DashboardPageManager = () => {
     userProfile,
     permissionRadarData,
     recentActions,
+    hasPendingSubmissions,
+    pendingMessageItems,
+    submissionStatusRatio,
     setSelectedRegionCode,
     refreshDashboard,
     triggerTestingRefresh,
@@ -93,6 +96,9 @@ const DashboardPageManager = () => {
           sessionExpiresAt={session?.expiresAt ?? null}
           permissionRadarData={permissionRadarData}
           recentActions={recentActions}
+          hasPendingSubmissions={hasPendingSubmissions}
+          pendingMessageItems={pendingMessageItems}
+          submissionStatusRatio={submissionStatusRatio}
         />
       </div>
     </section>

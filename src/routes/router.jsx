@@ -26,6 +26,7 @@ import CompanyCareerEditPageManager from '../pages/contentTypes/CompanyCareerEdi
 import SeoPageManager from '../pages/seo/SeoPageManager'
 import SeoScoreRecordsPageManager from '../pages/seo/SeoScoreRecordsPageManager'
 import SettingsPageManager from '../pages/settings/SettingsPageManager'
+import SubmissionsInboxPageManager from '../pages/submissions/SubmissionsInboxPageManager'
 import PlaceholderPage from '../pages/PlaceholderPage'
 import DashboardPageManager from '../pages/DashboardPageManager'
 import RequireAuth from './guards/RequireAuth'
@@ -235,6 +236,22 @@ const pageRoutes = [
     description: 'Global and page-level SEO controls.',
     primaryNav: 'seo',
     element: <SeoPageManager />,
+  },
+  {
+    path: 'submissions',
+    title: 'Messages',
+    description: 'Message center entry. Redirects to Lead Pending Review.',
+    primaryNav: 'submissions',
+    secondaryNav: 'submissions',
+    element: <Navigate to="/submissions/lead/new" replace />,
+  },
+  {
+    path: 'submissions/:source/:status',
+    title: 'Messages',
+    description: 'Manage incoming lead/contact/career submissions by status.',
+    primaryNav: 'submissions',
+    secondaryNav: 'submissions',
+    element: <SubmissionsInboxPageManager />,
   },
   {
     path: 'settings',
